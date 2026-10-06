@@ -1,113 +1,147 @@
-enum EntitlementState {
-  available,
-  claimed,
-  notIncluded,
+enum Outcome {
+  approved,
+  redeemed,
+  not_eligible,
+  invalid,
+  network,
 }
 
-enum RedemptionStatus {
-  success,
-  alreadyClaimed,
-  notEligible,
+enum CounterKey {
+  food,
+  merch,
 }
 
-class EntitlementItem {
-  final String id;
+enum FilterOption {
+  all,
+  approved,
+  rejected,
+}
+
+class CounterInfo {
+  final CounterKey key;
   final String name;
-  final EntitlementState state;
-  final String? claimedTime;
-  final String? claimedCounter;
+  final String benefit;
+  final String code;
+  final int total;
 
-  const EntitlementItem({
-    required this.id,
+  const CounterInfo({
+    required this.key,
     required this.name,
-    required this.state,
-    this.claimedTime,
-    this.claimedCounter,
+    required this.benefit,
+    required this.code,
+    required this.total,
   });
+
+  static const food = CounterInfo(
+    key: CounterKey.food,
+    name: 'Food Counter 01',
+    benefit: 'Lunch',
+    code: 'FC–01',
+    total: 842,
+  );
+
+  static const merch = CounterInfo(
+    key: CounterKey.merch,
+    name: 'Merchandise Counter',
+    benefit: 'T-Shirt',
+    code: 'MC–01',
+    total: 1221,
+  );
+
+  static CounterInfo fromKey(CounterKey key) {
+    return key == CounterKey.food ? food : merch;
+  }
+}
+
+class ScanModel {
+  final String id;
+  final String time;
+  final String name;
+  final String ticketId;
+  final String pass;
+  final String benefit;
+  final String counter;
+  final Outcome outcome;
+
+  const ScanModel({
+    required this.id,
+    required this.time,
+    required this.name,
+    required this.ticketId,
+    required this.pass,
+    required this.benefit,
+    required this.counter,
+    required this.outcome,
+  });
+
+  ScanModel copyWith({
+    String? id,
+    String? time,
+    String? name,
+    String? ticketId,
+    String? pass,
+    String? benefit,
+    String? counter,
+    Outcome? outcome,
+  }) {
+    return ScanModel(
+      id: id ?? this.id,
+      time: time ?? this.time,
+      name: name ?? this.name,
+      ticketId: ticketId ?? this.ticketId,
+      pass: pass ?? this.pass,
+      benefit: benefit ?? this.benefit,
+      counter: counter ?? this.counter,
+      outcome: outcome ?? this.outcome,
+    );
+  }
 }
 
 class AttendeeModel {
   final String ticketId;
   final String name;
-  final String email;
-  final String phone;
-  final String ticketType; // PREMIUM, STANDARD, VIP, etc.
-  final List<EntitlementItem> entitlements;
+  final String ticketType; // VIP, Premium, General
+  final List<String> benefits;
 
   const AttendeeModel({
     required this.ticketId,
     required this.name,
-    required this.email,
-    required this.phone,
     required this.ticketType,
-    required this.entitlements,
+    required this.benefits,
   });
-
-  EntitlementItem? getEntitlement(String itemName) {
-    try {
-      return entitlements.firstWhere(
-        (e) => e.name.toLowerCase() == itemName.toLowerCase(),
-      );
-    } catch (_) {
-      return null;
-    }
-  }
 }
 
 class VolunteerModel {
   final String id;
   final String name;
   final String role;
-  final String counterId;
-  final String counterName;
-  final String eventName;
-  final String avatarInitials;
+  final String email;
 
   const VolunteerModel({
     required this.id,
     required this.name,
     required this.role,
-    required this.counterId,
-    required this.counterName,
-    required this.eventName,
-    required this.avatarInitials,
+    required this.email,
   });
 }
 
-class HistoryLogItem {
-  final String id;
-  final String attendeeName;
-  final String ticketId;
-  final String item;
-  final String time;
-  final RedemptionStatus status;
-  final String counterId;
-  final String volunteerId;
+const String outcomeApprovedLabel = 'Approved';
+const String outcomeRedeemedLabel = 'Already redeemed';
+const String outcomeNotEligibleLabel = 'Not eligible';
+const String outcomeInvalidLabel = 'Invalid QR';
+const String outcomeNetworkLabel = 'Connection lost';
 
-  const HistoryLogItem({
-    required this.id,
-    required this.attendeeName,
-    required this.ticketId,
-    required this.item,
-    required this.time,
-    required this.status,
-    required this.counterId,
-    required this.volunteerId,
-  });
-}
-
-class CounterStats {
-  final int totalScans;
-  final int successfulClaims;
-  final int alreadyClaimed;
-  final int notEligible;
-  final int itemGoal;
-
-  const CounterStats({
-    required this.totalScans,
-    required this.successfulClaims,
-    required this.alreadyClaimed,
-    required this.notEligible,
-    required this.itemGoal,
-  });
+String getOutcomeLabel(Outcome outcome) {
+  switch (outcome) {
+    case Outcome.approved:
+      return outcomeApprovedLabel;
+    case Outcome.redeemed:
+      return outcomeRedeemedLabel;
+    case Outcome.not_eligible:
+      return outcomeNotEligibleLabel;
+    case Outcome.invalid:
+      return outcomeInvalidLabel;
+    case Outcome.network:
+      return outcomeNetworkLabel;
+  }
 }

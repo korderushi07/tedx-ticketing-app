@@ -7,18 +7,18 @@ class TEDxColors {
   static const Color tedRedSubtle = Color(0x26E62B1E);
 
   // Backgrounds & Neutral Surfaces
-  static const Color bgDark = Color(0xFF0A0A0A);
-  static const Color cardDark = Color(0xFF141414);
-  static const Color cardBorder = Color(0xFF262626);
-  static const Color surfaceElevated = Color(0xFF1F1F1F);
-  static const Color inputBg = Color(0xFF1A1A1A);
+  static const Color bgDark = Color(0xFF0D0D0D);
+  static const Color cardDark = Color(0xFF161618);
+  static const Color cardBorder = Color(0xFF262629);
+  static const Color surfaceElevated = Color(0xFF202024);
+  static const Color inputBg = Color(0xFF1C1C1E);
 
   // Text
   static const Color textPrimary = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFFA3A3A3);
-  static const Color textMuted = Color(0xFF737373);
+  static const Color textSecondary = Color(0xFFA1A1AA);
+  static const Color textMuted = Color(0xFF71717A);
 
-  // Operational Status Colors
+  // Status Colors
   static const Color success = Color(0xFF10B981);
   static const Color successBg = Color(0xFF022C22);
   static const Color successBorder = Color(0xFF059669);
@@ -30,9 +30,6 @@ class TEDxColors {
   static const Color error = Color(0xFFEF4444);
   static const Color errorBg = Color(0xFF450A0A);
   static const Color errorBorder = Color(0xFFDC2626);
-
-  static const Color info = Color(0xFF3B82F6);
-  static const Color infoBg = Color(0xFF1E3A8A);
 }
 
 class TEDxTheme {
@@ -79,9 +76,9 @@ class TEDxTheme {
             borderRadius: BorderRadius.circular(12),
           ),
           textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.2,
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
           ),
         ),
       ),
@@ -94,8 +91,8 @@ class TEDxTheme {
             borderRadius: BorderRadius.circular(12),
           ),
           textStyle: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),

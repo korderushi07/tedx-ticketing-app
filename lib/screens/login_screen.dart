@@ -3,27 +3,26 @@ import '../theme/app_theme.dart';
 import '../widgets/tedx_components.dart';
 
 class LoginScreen extends StatefulWidget {
-  final VoidCallback onLoginSuccess;
+  final VoidCallback onContinue;
 
-  const LoginScreen({super.key, required this.onLoginSuccess});
+  const LoginScreen({super.key, required this.onContinue});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _idController = TextEditingController(text: 'VOL-024');
-  final _passwordController = TextEditingController(text: '••••••••');
-  bool _obscurePassword = true;
-  bool _isLoading = false;
+  final _emailController = TextEditingController(text: 'rahul@volunteer.tedxnagpur.in');
+  final _pinController = TextEditingController(text: '1234');
+  String _errorMsg = '';
 
-  void _handleLogin() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (mounted) {
-      setState(() => _isLoading = false);
-      widget.onLoginSuccess();
+  void _handleSubmit() {
+    if (_emailController.text.trim().isEmpty || _pinController.text.trim().isEmpty) {
+      setState(() => _errorMsg = 'Enter your volunteer ID and PIN to continue.');
+      return;
     }
+    setState(() => _errorMsg = '');
+    widget.onContinue();
   }
 
   @override
@@ -36,40 +35,38 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 20),
-              // Top Brand Tag
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: TEDxColors.tedRedSubtle,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: TEDxColors.tedRed.withOpacity(0.3)),
-                ),
-                child: const Text(
-                  'INTERNAL OPERATIONS PORTAL',
-                  style: TextStyle(
-                    color: TEDxColors.tedRed,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              const TEDxLogo(fontSize: 36, subtitle: 'YCCE 2026'),
-              const SizedBox(height: 36),
+              const SizedBox(height: 12),
               const Text(
-                'Volunteer Login',
+                'EVENT OPERATIONS / VOLUNTEER',
                 style: TextStyle(
-                  color: TEDxColors.textPrimary,
-                  fontSize: 28,
+                  color: TEDxColors.tedRed,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+                  letterSpacing: 1.2,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 12),
+              RichText(
+                text: const TextSpan(
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1.0,
+                    height: 1.1,
+                  ),
+                  children: [
+                    TextSpan(text: 'Keep the\nday moving'),
+                    TextSpan(
+                      text: '.',
+                      style: TextStyle(color: TEDxColors.tedRed),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
               const Text(
-                'Sign in with your assigned volunteer credentials to begin scanning attendee passes.',
+                'One scan. A clear decision.\nA better event for everyone.',
                 style: TextStyle(
                   color: TEDxColors.textSecondary,
                   fontSize: 14,
@@ -77,108 +74,182 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 36),
-              // Form Fields
-              const Text(
-                'Volunteer ID / Email',
-                style: TextStyle(
-                  color: TEDxColors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _idController,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.badge_outlined, color: TEDxColors.textSecondary, size: 20),
-                  hintText: 'e.g. VOL-024',
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Password',
-                style: TextStyle(
-                  color: TEDxColors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.lock_outline_rounded, color: TEDxColors.textSecondary, size: 20),
-                  hintText: 'Enter password',
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                      color: TEDxColors.textSecondary,
-                      size: 20,
-                    ),
-                    onPressed: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Contact your Desk Lead to reset volunteer password.'),
-                        backgroundColor: TEDxColors.cardDark,
-                      ),
-                    );
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: TEDxColors.textSecondary,
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: const Text(
-                    'Forgot Password?',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              TEDxButton(
-                text: 'Sign In',
-                icon: Icons.arrow_forward_rounded,
-                isLoading: _isLoading,
-                onPressed: _handleLogin,
-              ),
-              const SizedBox(height: 32),
-              // Security info box
+
+              // Form Box
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: TEDxColors.cardDark,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: TEDxColors.cardBorder),
                 ),
-                child: const Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.shield_outlined, color: TEDxColors.textMuted, size: 18),
-                    SizedBox(width: 10),
-                    Expanded(
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Volunteer sign in',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          '18 OCT 2026',
+                          style: TextStyle(
+                            color: TEDxColors.tedRed.withValues(alpha: 0.9),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Email or volunteer ID',
+                      style: TextStyle(
+                        color: TEDxColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _emailController,
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                      decoration: const InputDecoration(
+                        hintText: 'Your volunteer ID',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'PIN',
+                      style: TextStyle(
+                        color: TEDxColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _pinController,
+                      obscureText: true,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                      decoration: const InputDecoration(
+                        hintText: 'Enter your PIN',
+                      ),
+                    ),
+                    if (_errorMsg.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _errorMsg,
+                        style: const TextStyle(
+                          color: TEDxColors.error,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    ActionButton(
+                      text: 'CONTINUE',
+                      trailingArrow: '→',
+                      onPressed: _handleSubmit,
+                    ),
+                    const SizedBox(height: 12),
+                    const Center(
                       child: Text(
-                        'Authorized Personnel Only. All scan actions are logged with Volunteer ID and Counter Timestamp.',
+                        'Use the credentials shared by your counter lead.',
                         style: TextStyle(
                           color: TEDxColors.textMuted,
                           fontSize: 11,
-                          height: 1.3,
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
+
+              const SizedBox(height: 28),
+
+              // Demo Access Banner
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: TEDxColors.inputBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: TEDxColors.cardBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'EXPLORING THE PROTOTYPE?',
+                      style: TextStyle(
+                        color: TEDxColors.textMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: widget.onContinue,
+                      child: const Row(
+                        children: [
+                          Text(
+                            'Use demo volunteer access',
+                            style: TextStyle(
+                              color: TEDxColors.tedRed,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            '→',
+                            style: TextStyle(
+                              color: TEDxColors.tedRed,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'No account or credentials required.',
+                      style: TextStyle(
+                        color: TEDxColors.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 36),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'TEDx Event Operations',
+                    style: TextStyle(color: TEDxColors.textMuted, fontSize: 11),
+                  ),
+                  Text(
+                    'VOLUNTEER ACCESS',
+                    style: TextStyle(color: TEDxColors.textMuted, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.8),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
             ],
           ),
         ),

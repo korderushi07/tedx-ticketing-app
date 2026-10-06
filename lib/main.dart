@@ -1,24 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
 import 'models/app_models.dart';
+import 'widgets/tedx_components.dart';
 
 // Screens
-import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/counter_assignment_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/qr_scanner_screen.dart';
 import 'screens/attendee_verification_screen.dart';
 import 'screens/success_redemption_screen.dart';
-import 'screens/already_claimed_screen.dart';
-import 'screens/not_eligible_screen.dart';
 import 'screens/attendee_details_screen.dart';
 import 'screens/redemption_history_screen.dart';
-import 'screens/counter_statistics_screen.dart';
-import 'screens/profile_screen.dart';
-import 'screens/confirmation_modal.dart';
-import 'screens/network_error_screen.dart';
-import 'screens/session_expired_screen.dart';
 
 void main() {
   runApp(const TEDxEventOpsApp());
@@ -30,220 +24,136 @@ class TEDxEventOpsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'TEDx Event Ops',
+      title: 'TEDx Nagpur 2026',
       debugShowCheckedModeBanner: false,
       theme: TEDxTheme.darkTheme,
-      home: const MainNavigationController(),
+      home: const VolunteerWorkspace(),
     );
   }
 }
 
-enum AppStateView {
-  splash, // 1
-  login, // 2
-  counterAssignment, // 3
-  dashboard, // 4 (Main Shell)
-  qrScanner, // 5
-  verification, // 6
-  successRedemption, // 7
-  alreadyClaimed, // 8
-  notEligible, // 9
-  attendeeDetails, // 10
-  redemptionHistory, // 11
-  counterStatistics, // 12
-  profile, // 13
-  networkError, // 15
-  sessionExpired, // 16
-}
-
-class MainNavigationController extends StatefulWidget {
-  const MainNavigationController({super.key});
+class VolunteerWorkspace extends StatefulWidget {
+  const VolunteerWorkspace({super.key});
 
   @override
-  State<MainNavigationController> createState() => _MainNavigationControllerState();
+  State<VolunteerWorkspace> createState() => _VolunteerWorkspaceState();
 }
 
-class _MainNavigationControllerState extends State<MainNavigationController> {
-  AppStateView _currentView = AppStateView.splash;
-  int _bottomNavIndex = 0; // 0: Home, 1: Scan, 2: History, 3: Profile
+class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
+  String _screen = 'login'; // login, counter, dashboard, scanner, verifying, history, detail, or outcome name
+  CounterKey _counterKey = CounterKey.food;
 
-  // Active Volunteer State
-  VolunteerModel _volunteer = const VolunteerModel(
-    id: 'VOL-024',
-    name: 'Rushikesh Korde',
-    role: 'Counter Volunteer',
-    counterId: 'C-03',
-    counterName: 'T-Shirt Counter',
-    eventName: 'TEDx YCCE 2026',
-    avatarInitials: 'RK',
-  );
-
-  // Counter Statistics
-  CounterStats _stats = const CounterStats(
-    totalScans: 248,
-    successfulClaims: 192,
-    alreadyClaimed: 31,
-    notEligible: 25,
-    itemGoal: 500,
-  );
-
-  // Mock Attendees
-  final Map<String, AttendeeModel> _attendeeDb = {
-    'TDX-2026-10482': const AttendeeModel(
-      ticketId: 'TDX-2026-10482',
-      name: 'Rahul Sharma',
-      email: 'rahul.sharma@example.com',
-      phone: '+91 98765 43210',
-      ticketType: 'PREMIUM',
-      entitlements: [
-        EntitlementItem(
-          id: '1',
-          name: 'Food',
-          state: EntitlementState.claimed,
-          claimedTime: '09:15 AM',
-          claimedCounter: 'C-01',
-        ),
-        EntitlementItem(
-          id: '2',
-          name: 'Goodie Bag',
-          state: EntitlementState.claimed,
-          claimedTime: '09:20 AM',
-          claimedCounter: 'C-02',
-        ),
-        EntitlementItem(
-          id: '3',
-          name: 'T-Shirt',
-          state: EntitlementState.available,
-        ),
-        EntitlementItem(
-          id: '4',
-          name: 'VIP Workshop',
-          state: EntitlementState.notIncluded,
-        ),
-      ],
-    ),
-    'TDX-2026-CLAIMED': const AttendeeModel(
-      ticketId: 'TDX-2026-CLAIMED',
-      name: 'Rahul Sharma',
-      email: 'rahul.sharma@example.com',
-      phone: '+91 98765 43210',
-      ticketType: 'PREMIUM',
-      entitlements: [
-        EntitlementItem(
-          id: '3',
-          name: 'T-Shirt',
-          state: EntitlementState.claimed,
-          claimedTime: '10:42 AM',
-          claimedCounter: 'C-03',
-        ),
-      ],
-    ),
-    'TDX-2026-NOT-ELIGIBLE': const AttendeeModel(
-      ticketId: 'TDX-2026-NOT-ELIGIBLE',
-      name: 'Sneha Joshi',
-      email: 'sneha.j@example.com',
-      phone: '+91 98123 45678',
-      ticketType: 'STANDARD',
-      entitlements: [
-        EntitlementItem(id: '1', name: 'Food', state: EntitlementState.claimed),
-        EntitlementItem(
-            id: '3', name: 'T-Shirt', state: EntitlementState.notIncluded),
-      ],
-    ),
+  final Map<CounterKey, int> _addedCount = {
+    CounterKey.food: 0,
+    CounterKey.merch: 0,
   };
 
-  late AttendeeModel _currentAttendee;
-
-  // History Logs
-  final List<HistoryLogItem> _historyLogs = [
-    const HistoryLogItem(
-      id: 'L-101',
-      attendeeName: 'Rahul Sharma',
-      ticketId: 'TDX-2026-10482',
-      item: 'T-Shirt',
-      time: '10:42 AM',
-      status: RedemptionStatus.success,
-      counterId: 'C-03',
-      volunteerId: 'VOL-024',
+  List<ScanModel> _history = [
+    const ScanModel(
+      id: 'scan-3',
+      time: '01:47 PM',
+      name: 'Rushikesh Korde',
+      ticketId: 'TKT-92831',
+      pass: 'VIP',
+      benefit: 'Lunch',
+      counter: 'Food Counter 01',
+      outcome: Outcome.redeemed,
     ),
-    const HistoryLogItem(
-      id: 'L-102',
-      attendeeName: 'Amit Patil',
-      ticketId: 'TDX-2026-10483',
-      item: 'T-Shirt',
-      time: '10:44 AM',
-      status: RedemptionStatus.success,
-      counterId: 'C-03',
-      volunteerId: 'VOL-024',
+    const ScanModel(
+      id: 'scan-2',
+      time: '01:44 PM',
+      name: 'Nehal Mehta',
+      ticketId: 'TKT-92842',
+      pass: 'Premium',
+      benefit: 'Lunch',
+      counter: 'Food Counter 01',
+      outcome: Outcome.approved,
     ),
-    const HistoryLogItem(
-      id: 'L-103',
-      attendeeName: 'Sneha Joshi',
-      ticketId: 'TDX-2026-10484',
-      item: 'T-Shirt',
-      time: '10:48 AM',
-      status: RedemptionStatus.alreadyClaimed,
-      counterId: 'C-03',
-      volunteerId: 'VOL-014',
-    ),
-    const HistoryLogItem(
-      id: 'L-104',
-      attendeeName: 'Priya Nair',
-      ticketId: 'TDX-2026-10485',
-      item: 'T-Shirt',
-      time: '10:52 AM',
-      status: RedemptionStatus.notEligible,
-      counterId: 'C-03',
-      volunteerId: 'VOL-024',
+    const ScanModel(
+      id: 'scan-1',
+      time: '01:42 PM',
+      name: 'Rushikesh Korde',
+      ticketId: 'TKT-92831',
+      pass: 'VIP',
+      benefit: 'Lunch',
+      counter: 'Food Counter 01',
+      outcome: Outcome.approved,
     ),
   ];
 
+  ScanModel? _result;
+  ScanModel? _pending;
+  Timer? _verifyingTimer;
+
   @override
-  void initState() {
-    super.initState();
-    _currentAttendee = _attendeeDb['TDX-2026-10482']!;
+  void dispose() {
+    _verifyingTimer?.cancel();
+    super.dispose();
   }
 
-  void _processScannedCode(String scannedId) {
-    if (scannedId == 'TDX-2026-CLAIMED') {
-      setState(() {
-        _currentAttendee = _attendeeDb['TDX-2026-CLAIMED']!;
-        _currentView = AppStateView.alreadyClaimed;
-      });
-    } else if (scannedId == 'TDX-2026-NOT-ELIGIBLE') {
-      setState(() {
-        _currentAttendee = _attendeeDb['TDX-2026-NOT-ELIGIBLE']!;
-        _currentView = AppStateView.notEligible;
-      });
-    } else {
-      final attendee = _attendeeDb[scannedId] ?? _attendeeDb['TDX-2026-10482']!;
-      setState(() {
-        _currentAttendee = attendee;
-        _currentView = AppStateView.verification;
-      });
-    }
-  }
+  CounterInfo get _activeCounter => CounterInfo.fromKey(_counterKey);
 
-  void _onConfirmClaimAction() async {
-    final confirmed = await ConfirmationModal.show(
-      context,
-      attendeeName: _currentAttendee.name,
-      ticketType: _currentAttendee.ticketType,
-      item: _volunteer.counterName.replaceAll(' Counter', ''),
+  void _simulateScan(Outcome targetOutcome, CounterKey? scenarioCounterKey) {
+    if (_screen == 'verifying') return;
+
+    final targetCounterKey = scenarioCounterKey ?? _counterKey;
+    final selectedCounter = CounterInfo.fromKey(targetCounterKey);
+
+    final String name = targetOutcome == Outcome.not_eligible ? 'Aarav Sharma' : 'Rushikesh Korde';
+    final String ticketId = targetOutcome == Outcome.not_eligible ? 'TKT-92804' : 'TKT-92831';
+    final String pass = targetOutcome == Outcome.not_eligible ? 'GENERAL' : 'VIP';
+
+    final duplicate = _history.any(
+      (scan) =>
+          scan.outcome == Outcome.approved &&
+          scan.ticketId == ticketId &&
+          scan.benefit == selectedCounter.benefit &&
+          scan.id.startsWith('session-'),
     );
 
-    if (confirmed == true && mounted) {
+    final finalOutcome = (targetOutcome == Outcome.approved && duplicate)
+        ? Outcome.redeemed
+        : targetOutcome;
+
+    final now = DateTime.now();
+    final hour = now.hour % 12 == 0 ? 12 : now.hour % 12;
+    final minute = now.minute.toString().padLeft(2, '0');
+    final amPm = now.hour >= 12 ? 'PM' : 'AM';
+    final formattedTime = '${hour.toString().padLeft(2, '0')}:$minute $amPm';
+
+    final scan = ScanModel(
+      id: 'session-${DateTime.now().millisecondsSinceEpoch}',
+      time: formattedTime,
+      name: name,
+      ticketId: ticketId,
+      pass: pass,
+      benefit: selectedCounter.benefit,
+      counter: selectedCounter.name,
+      outcome: finalOutcome,
+    );
+
+    setState(() {
+      _counterKey = targetCounterKey;
+      _pending = scan;
+      _screen = 'verifying';
+    });
+
+    _verifyingTimer?.cancel();
+    _verifyingTimer = Timer(const Duration(milliseconds: 900), () {
+      if (!mounted || _pending == null) return;
+      final pendingScan = _pending!;
       setState(() {
-        _stats = CounterStats(
-          totalScans: _stats.totalScans + 1,
-          successfulClaims: _stats.successfulClaims + 1,
-          alreadyClaimed: _stats.alreadyClaimed,
-          notEligible: _stats.notEligible,
-          itemGoal: _stats.itemGoal,
-        );
-        _currentView = AppStateView.successRedemption;
+        _result = pendingScan;
+        if (pendingScan.outcome != Outcome.network) {
+          _history = [pendingScan, ..._history];
+        }
+        if (pendingScan.outcome == Outcome.approved) {
+          _addedCount[_counterKey] = (_addedCount[_counterKey] ?? 0) + 1;
+        }
+        _screen = pendingScan.outcome.name;
+        _pending = null;
       });
-    }
+    });
   }
 
   void _showScreenSwitcherSheet() {
@@ -257,8 +167,8 @@ class _MainNavigationControllerState extends State<MainNavigationController> {
       builder: (ctx) {
         return DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.7,
-          maxChildSize: 0.9,
+          initialChildSize: 0.65,
+          maxChildSize: 0.85,
           builder: (_, controller) {
             return Padding(
               padding: const EdgeInsets.all(20),
@@ -281,49 +191,32 @@ class _MainNavigationControllerState extends State<MainNavigationController> {
                       Icon(Icons.dashboard_customize_rounded, color: TEDxColors.tedRed),
                       SizedBox(width: 8),
                       Text(
-                        'Direct 16-Screen Preview Navigator',
+                        'Direct UI Screen Switcher',
                         style: TextStyle(
-                          color: TEDxColors.textPrimary,
+                          color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Select any of the 16 required screens to test immediately:',
-                    style: TextStyle(color: TEDxColors.textSecondary, fontSize: 12),
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Expanded(
                     child: ListView(
                       controller: controller,
                       children: [
-                        _screenTile(ctx, '1. Splash Screen', AppStateView.splash),
-                        _screenTile(ctx, '2. Volunteer Login', AppStateView.login),
-                        _screenTile(ctx, '3. Counter Assignment', AppStateView.counterAssignment),
-                        _screenTile(ctx, '4. Volunteer Dashboard', AppStateView.dashboard, navTab: 0),
-                        _screenTile(ctx, '5. QR Scanner Screen', AppStateView.qrScanner),
-                        _screenTile(ctx, '6. Attendee Verification', AppStateView.verification),
-                        _screenTile(ctx, '7. Successful Redemption', AppStateView.successRedemption),
-                        _screenTile(ctx, '8. Already Claimed Screen', AppStateView.alreadyClaimed),
-                        _screenTile(ctx, '9. Not Eligible Screen', AppStateView.notEligible),
-                        _screenTile(ctx, '10. Attendee Details Screen', AppStateView.attendeeDetails),
-                        _screenTile(ctx, '11. Redemption History', AppStateView.redemptionHistory, navTab: 2),
-                        _screenTile(ctx, '12. Counter Statistics', AppStateView.counterStatistics),
-                        _screenTile(ctx, '13. Volunteer Profile', AppStateView.profile, navTab: 3),
-                        ListTile(
-                          onTap: () {
-                            Navigator.pop(ctx);
-                            _onConfirmClaimAction();
-                          },
-                          leading: const Icon(Icons.touch_app_rounded, color: TEDxColors.tedRed, size: 20),
-                          title: const Text('14. Confirmation Modal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
-                          subtitle: const Text('Triggers bottom sheet modal', style: TextStyle(color: TEDxColors.textMuted, fontSize: 11)),
-                        ),
-                        _screenTile(ctx, '15. Network Error State', AppStateView.networkError),
-                        _screenTile(ctx, '16. Session Expired State', AppStateView.sessionExpired),
+                        _screenTile(ctx, '1. Login Screen', 'login'),
+                        _screenTile(ctx, '2. Counter Assignment', 'counter'),
+                        _screenTile(ctx, '3. Dashboard (Counter)', 'dashboard'),
+                        _screenTile(ctx, '4. Scanner View', 'scanner'),
+                        _screenTile(ctx, '5. Verifying State', 'verifying'),
+                        _screenTile(ctx, '6. Outcome: Approved', 'approved'),
+                        _screenTile(ctx, '7. Outcome: Already Redeemed', 'redeemed'),
+                        _screenTile(ctx, '8. Outcome: Not Eligible', 'not_eligible'),
+                        _screenTile(ctx, '9. Outcome: Invalid QR', 'invalid'),
+                        _screenTile(ctx, '10. Outcome: Connection Lost', 'network'),
+                        _screenTile(ctx, '11. Scan History', 'history'),
+                        _screenTile(ctx, '12. Scan Detail View', 'detail'),
                       ],
                     ),
                   ),
@@ -336,14 +229,34 @@ class _MainNavigationControllerState extends State<MainNavigationController> {
     );
   }
 
-  Widget _screenTile(BuildContext ctx, String name, AppStateView view, {int navTab = 0}) {
-    final isCurrent = _currentView == view;
+  Widget _screenTile(BuildContext ctx, String label, String screenTarget) {
+    final isCurrent = _screen == screenTarget;
     return ListTile(
       onTap: () {
         Navigator.pop(ctx);
         setState(() {
-          _currentView = view;
-          _bottomNavIndex = navTab;
+          if (screenTarget == 'approved' ||
+              screenTarget == 'redeemed' ||
+              screenTarget == 'not_eligible' ||
+              screenTarget == 'invalid' ||
+              screenTarget == 'network' ||
+              screenTarget == 'detail') {
+            final outcome = Outcome.values.firstWhere(
+              (e) => e.name == screenTarget,
+              orElse: () => Outcome.approved,
+            );
+            _result = ScanModel(
+              id: 'demo-sample',
+              time: '01:45 PM',
+              name: 'Rushikesh Korde',
+              ticketId: 'TKT-92831',
+              pass: 'VIP',
+              benefit: _activeCounter.benefit,
+              counter: _activeCounter.name,
+              outcome: outcome,
+            );
+          }
+          _screen = screenTarget;
         });
       },
       leading: Icon(
@@ -352,7 +265,7 @@ class _MainNavigationControllerState extends State<MainNavigationController> {
         size: 20,
       ),
       title: Text(
-        name,
+        label,
         style: TextStyle(
           color: isCurrent ? TEDxColors.tedRed : Colors.white,
           fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
@@ -364,244 +277,178 @@ class _MainNavigationControllerState extends State<MainNavigationController> {
 
   @override
   Widget build(BuildContext context) {
+    final showNav = _screen != 'login' && _screen != 'counter';
+    final scopedHistory = _history.where((scan) => scan.counter == _activeCounter.name).toList();
+
+    ScanModel? lastSuccess;
+    if (_result != null) {
+      try {
+        lastSuccess = _history.firstWhere(
+          (scan) =>
+              scan.outcome == Outcome.approved &&
+              scan.ticketId == _result!.ticketId &&
+              scan.benefit == _result!.benefit,
+        );
+      } catch (_) {
+        lastSuccess = null;
+      }
+    }
+
     Widget bodyWidget;
-    bool showBottomBar = false;
 
-    switch (_currentView) {
-      case AppStateView.splash:
-        bodyWidget = SplashScreen(
-          onFinish: () => setState(() => _currentView = AppStateView.login),
-        );
-        break;
+    if (_screen == 'login') {
+      bodyWidget = LoginScreen(
+        onContinue: () => setState(() => _screen = 'counter'),
+      );
+    } else if (_screen == 'counter') {
+      bodyWidget = CounterAssignmentScreen(
+        counter: _activeCounter,
+        onStartScanning: () => setState(() => _screen = 'dashboard'),
+      );
+    } else if (_screen == 'dashboard') {
+      bodyWidget = DashboardScreen(
+        counter: _activeCounter,
+        addedCount: _addedCount[_counterKey] ?? 0,
+        recentScans: scopedHistory,
+        onScanClick: () => setState(() => _screen = 'scanner'),
+        onViewHistoryClick: () => setState(() => _screen = 'history'),
+        onSelectScan: (scan) {
+          setState(() {
+            _result = scan;
+            _screen = 'detail';
+          });
+        },
+        onSwitchCounter: (key) => setState(() => _counterKey = key),
+      );
+    } else if (_screen == 'scanner') {
+      bodyWidget = QRScannerScreen(
+        counter: _activeCounter,
+        totalScans: _activeCounter.total + (_addedCount[_counterKey] ?? 0),
+        onSimulateScan: _simulateScan,
+      );
+    } else if (_screen == 'verifying') {
+      bodyWidget = AttendeeVerificationScreen(counter: _activeCounter);
+    } else if (_screen == 'history') {
+      bodyWidget = RedemptionHistoryScreen(
+        counter: _activeCounter,
+        history: _history,
+        onSelectScan: (scan) {
+          setState(() {
+            _result = scan;
+            _screen = 'detail';
+          });
+        },
+      );
+    } else if (_screen == 'detail' && _result != null) {
+      bodyWidget = AttendeeDetailsScreen(
+        scan: _result!,
+        onBackPressed: () => setState(() => _screen = 'history'),
+      );
+    } else if (_result != null) {
+      bodyWidget = OutcomeResultScreen(
+        scan: _result!,
+        lastSuccess: lastSuccess,
+        onActionClick: () => setState(() => _screen = 'scanner'),
+      );
+    } else {
+      bodyWidget = DashboardScreen(
+        counter: _activeCounter,
+        addedCount: _addedCount[_counterKey] ?? 0,
+        recentScans: scopedHistory,
+        onScanClick: () => setState(() => _screen = 'scanner'),
+        onViewHistoryClick: () => setState(() => _screen = 'history'),
+        onSelectScan: (scan) {
+          setState(() {
+            _result = scan;
+            _screen = 'detail';
+          });
+        },
+        onSwitchCounter: (key) => setState(() => _counterKey = key),
+      );
+    }
 
-      case AppStateView.login:
-        bodyWidget = LoginScreen(
-          onLoginSuccess: () => setState(() => _currentView = AppStateView.counterAssignment),
-        );
-        break;
-
-      case AppStateView.counterAssignment:
-        bodyWidget = CounterAssignmentScreen(
-          onStartCounter: () => setState(() {
-            _currentView = AppStateView.dashboard;
-            _bottomNavIndex = 0;
-          }),
-        );
-        break;
-
-      case AppStateView.dashboard:
-        showBottomBar = true;
-        if (_bottomNavIndex == 0) {
-          bodyWidget = DashboardScreen(
-            volunteer: _volunteer,
-            stats: _stats,
-            onOpenScanner: () => setState(() => _currentView = AppStateView.qrScanner),
-            onTabSelected: (index) => setState(() => _bottomNavIndex = index),
-            onOpenProfile: () => setState(() {
-              _currentView = AppStateView.profile;
-              _bottomNavIndex = 3;
-            }),
-            onOpenStats: () => setState(() => _currentView = AppStateView.counterStatistics),
-          );
-        } else if (_bottomNavIndex == 1) {
-          bodyWidget = QRScannerScreen(
-            volunteer: _volunteer,
-            onClose: () => setState(() => _bottomNavIndex = 0),
-            onScanComplete: _processScannedCode,
-          );
-        } else if (_bottomNavIndex == 2) {
-          bodyWidget = RedemptionHistoryScreen(
-            logs: _historyLogs,
-            onItemTap: (log) {
-              setState(() {
-                _currentAttendee = _attendeeDb['TDX-2026-10482']!;
-                _currentView = AppStateView.attendeeDetails;
-              });
-            },
-          );
-        } else {
-          bodyWidget = ProfileScreen(
-            volunteer: _volunteer,
-            onLogout: () => setState(() => _currentView = AppStateView.login),
-            onSwitchCounter: () => setState(() => _currentView = AppStateView.counterAssignment),
-            onTriggerOfflineDemo: () => setState(() => _currentView = AppStateView.networkError),
-            onTriggerExpiredDemo: () => setState(() => _currentView = AppStateView.sessionExpired),
-          );
-        }
-        break;
-
-      case AppStateView.qrScanner:
-        bodyWidget = QRScannerScreen(
-          volunteer: _volunteer,
-          onClose: () => setState(() => _currentView = AppStateView.dashboard),
-          onScanComplete: _processScannedCode,
-        );
-        break;
-
-      case AppStateView.verification:
-        bodyWidget = AttendeeVerificationScreen(
-          attendee: _currentAttendee,
-          currentCounterItem: 'T-Shirt',
-          onConfirmClaim: _onConfirmClaimAction,
-          onCancel: () => setState(() => _currentView = AppStateView.qrScanner),
-          onViewFullProfile: () => setState(() => _currentView = AppStateView.attendeeDetails),
-        );
-        break;
-
-      case AppStateView.successRedemption:
-        bodyWidget = SuccessRedemptionScreen(
-          attendeeName: _currentAttendee.name,
-          ticketType: _currentAttendee.ticketType,
-          item: 'T-Shirt',
-          time: '10:42 AM',
-          counterId: _volunteer.counterId,
-          onScanNext: () => setState(() => _currentView = AppStateView.qrScanner),
-          onViewDetails: () => setState(() => _currentView = AppStateView.attendeeDetails),
-        );
-        break;
-
-      case AppStateView.alreadyClaimed:
-        bodyWidget = AlreadyClaimedScreen(
-          attendeeName: _currentAttendee.name,
-          item: 'T-Shirt',
-          claimedTime: '10:42 AM',
-          counterId: _volunteer.counterId,
-          volunteerId: 'VOL-014',
-          onScanNext: () => setState(() => _currentView = AppStateView.qrScanner),
-        );
-        break;
-
-      case AppStateView.notEligible:
-        bodyWidget = NotEligibleScreen(
-          attendeeName: _currentAttendee.name,
-          ticketType: _currentAttendee.ticketType,
-          item: 'T-Shirt',
-          message: 'This item is not included in the attendee\'s ticket. Standard tickets only include Food & Goodie Bag.',
-          onScanNext: () => setState(() => _currentView = AppStateView.qrScanner),
-        );
-        break;
-
-      case AppStateView.attendeeDetails:
-        bodyWidget = AttendeeDetailsScreen(
-          attendee: _currentAttendee,
-          onBackPressed: () => setState(() => _currentView = AppStateView.dashboard),
-        );
-        break;
-
-      case AppStateView.redemptionHistory:
-        bodyWidget = RedemptionHistoryScreen(
-          logs: _historyLogs,
-          onItemTap: (log) => setState(() => _currentView = AppStateView.attendeeDetails),
-        );
-        break;
-
-      case AppStateView.counterStatistics:
-        bodyWidget = CounterStatisticsScreen(
-          volunteer: _volunteer,
-          stats: _stats,
-          onBackPressed: () => setState(() => _currentView = AppStateView.dashboard),
-        );
-        break;
-
-      case AppStateView.profile:
-        bodyWidget = ProfileScreen(
-          volunteer: _volunteer,
-          onLogout: () => setState(() => _currentView = AppStateView.login),
-          onSwitchCounter: () => setState(() => _currentView = AppStateView.counterAssignment),
-          onTriggerOfflineDemo: () => setState(() => _currentView = AppStateView.networkError),
-          onTriggerExpiredDemo: () => setState(() => _currentView = AppStateView.sessionExpired),
-        );
-        break;
-
-      case AppStateView.networkError:
-        bodyWidget = NetworkErrorScreen(
-          onRetry: () => setState(() => _currentView = AppStateView.dashboard),
-          onBackToScanner: () => setState(() => _currentView = AppStateView.qrScanner),
-        );
-        break;
-
-      case AppStateView.sessionExpired:
-        bodyWidget = SessionExpiredScreen(
-          onSignIn: () => setState(() => _currentView = AppStateView.login),
-        );
-        break;
+    String activeTab = 'dashboard';
+    if (_screen == 'history' || _screen == 'detail') {
+      activeTab = 'history';
+    } else if (_screen == 'scanner') {
+      activeTab = 'scanner';
     }
 
     return Scaffold(
       backgroundColor: TEDxColors.bgDark,
-      body: Stack(
+      body: Column(
         children: [
-          bodyWidget,
+          const TEDxTopBar(),
+          Expanded(
+            child: Stack(
+              children: [
+                bodyWidget,
 
-          // Global Floating Quick Screen Switcher Trigger Button
-          Positioned(
-            bottom: showBottomBar ? 76 : 16,
-            right: 16,
-            child: FloatingActionButton.extended(
-              onPressed: _showScreenSwitcherSheet,
-              backgroundColor: TEDxColors.cardDark,
-              foregroundColor: Colors.white,
-              elevation: 8,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-                side: const BorderSide(color: TEDxColors.tedRed, width: 1.5),
-              ),
-              icon: const Icon(Icons.layers_rounded, color: TEDxColors.tedRed, size: 18),
-              label: const Text(
-                '16 Screens',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                  letterSpacing: 0.5,
+                // Floating Screen Switcher Trigger
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: FloatingActionButton.extended(
+                    onPressed: _showScreenSwitcherSheet,
+                    backgroundColor: TEDxColors.cardDark,
+                    foregroundColor: Colors.white,
+                    elevation: 8,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      side: const BorderSide(color: TEDxColors.tedRed, width: 1.5),
+                    ),
+                    icon: const Icon(Icons.layers_rounded, color: TEDxColors.tedRed, size: 18),
+                    label: const Text(
+                      'All Screens',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
       ),
-      bottomNavigationBar: showBottomBar
+      bottomNavigationBar: showNav
           ? Container(
               decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: TEDxColors.cardBorder, width: 1),
-                ),
+                border: Border(top: BorderSide(color: TEDxColors.cardBorder, width: 1)),
               ),
               child: BottomNavigationBar(
-                currentIndex: _bottomNavIndex,
+                currentIndex: activeTab == 'dashboard' ? 0 : (activeTab == 'scanner' ? 1 : 2),
                 onTap: (index) {
+                  if (_screen == 'verifying') return;
                   setState(() {
-                    _bottomNavIndex = index;
-                    if (index == 1) {
-                      _currentView = AppStateView.qrScanner;
-                    } else if (index == 2) {
-                      _currentView = AppStateView.redemptionHistory;
-                    } else if (index == 3) {
-                      _currentView = AppStateView.profile;
+                    if (index == 0) {
+                      _screen = 'dashboard';
+                    } else if (index == 1) {
+                      _screen = 'scanner';
                     } else {
-                      _currentView = AppStateView.dashboard;
+                      _screen = 'history';
                     }
                   });
                 },
                 items: [
                   const BottomNavigationBarItem(
-                    icon: Icon(Icons.home_filled),
-                    label: 'Home',
+                    icon: Icon(Icons.meeting_room_outlined),
+                    activeIcon: Icon(Icons.meeting_room_rounded),
+                    label: 'Counter',
                   ),
                   BottomNavigationBarItem(
                     icon: Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: _bottomNavIndex == 1
-                            ? TEDxColors.tedRed
-                            : TEDxColors.tedRedSubtle,
+                        color: activeTab == 'scanner' ? TEDxColors.tedRed : TEDxColors.tedRedSubtle,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.qr_code_scanner_rounded,
-                        color: _bottomNavIndex == 1
-                            ? Colors.white
-                            : TEDxColors.tedRed,
-                        size: 22,
+                        color: activeTab == 'scanner' ? Colors.white : TEDxColors.tedRed,
+                        size: 20,
                       ),
                     ),
                     label: 'Scan',
@@ -609,10 +456,6 @@ class _MainNavigationControllerState extends State<MainNavigationController> {
                   const BottomNavigationBarItem(
                     icon: Icon(Icons.history_rounded),
                     label: 'History',
-                  ),
-                  const BottomNavigationBarItem(
-                    icon: Icon(Icons.person_outline_rounded),
-                    label: 'Profile',
                   ),
                 ],
               ),
