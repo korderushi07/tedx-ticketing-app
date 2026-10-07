@@ -161,7 +161,7 @@ class ActionButton extends StatelessWidget {
                       letterSpacing: 0.6,
                     ),
                   ),
-                  if (subtitle != null) subtitle!,
+                  ?subtitle,
                 ],
               ),
             ),

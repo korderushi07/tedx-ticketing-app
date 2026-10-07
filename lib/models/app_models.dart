@@ -62,6 +62,9 @@ class ScanModel {
   final String benefit;
   final String counter;
   final Outcome outcome;
+  final int? attendeeId;
+  final int? addonId;
+  final int? counterId;
 
   const ScanModel({
     required this.id,
@@ -72,6 +75,9 @@ class ScanModel {
     required this.benefit,
     required this.counter,
     required this.outcome,
+    this.attendeeId,
+    this.addonId,
+    this.counterId,
   });
 
   ScanModel copyWith({
@@ -83,6 +89,9 @@ class ScanModel {
     String? benefit,
     String? counter,
     Outcome? outcome,
+    int? attendeeId,
+    int? addonId,
+    int? counterId,
   }) {
     return ScanModel(
       id: id ?? this.id,
@@ -93,6 +102,9 @@ class ScanModel {
       benefit: benefit ?? this.benefit,
       counter: counter ?? this.counter,
       outcome: outcome ?? this.outcome,
+      attendeeId: attendeeId ?? this.attendeeId,
+      addonId: addonId ?? this.addonId,
+      counterId: counterId ?? this.counterId,
     );
   }
 }

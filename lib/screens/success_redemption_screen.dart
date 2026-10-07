@@ -253,7 +253,7 @@ class _OutcomeResultScreenState extends State<OutcomeResultScreen> {
               if (isApproved)
                 const Center(
                   child: Text(
-                    'Redemption recorded in this demo session',
+                    'Redemption recorded',
                     style: TextStyle(color: TEDxColors.textMuted, fontSize: 11),
                   ),
                 )

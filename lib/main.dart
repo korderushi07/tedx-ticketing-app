@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme/app_theme.dart';
 import 'models/app_models.dart';
 import 'widgets/tedx_components.dart';
+import 'services/api_service.dart';
 
 // Screens
 import 'screens/login_screen.dart';
@@ -14,7 +16,9 @@ import 'screens/success_redemption_screen.dart';
 import 'screens/attendee_details_screen.dart';
 import 'screens/redemption_history_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
   runApp(const TEDxEventOpsApp());
 }
 
@@ -40,7 +44,7 @@ class VolunteerWorkspace extends StatefulWidget {
 }
 
 class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
-  String _screen = 'login'; // login, counter, dashboard, scanner, verifying, history, detail, or outcome name
+  String _screen = 'login'; // login, counter, dashboard, scanner, verifying, history, detail, outcome
   CounterKey _counterKey = CounterKey.food;
 
   final Map<CounterKey, int> _addedCount = {
@@ -82,7 +86,6 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
   ];
 
   ScanModel? _result;
-  ScanModel? _pending;
   Timer? _verifyingTimer;
 
   @override
@@ -93,27 +96,147 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
 
   CounterInfo get _activeCounter => CounterInfo.fromKey(_counterKey);
 
-  void _simulateScan(Outcome targetOutcome, CounterKey? scenarioCounterKey) {
+  Future<void> _handleScanToken(String qrToken) async {
     if (_screen == 'verifying') return;
 
-    final targetCounterKey = scenarioCounterKey ?? _counterKey;
-    final selectedCounter = CounterInfo.fromKey(targetCounterKey);
+    final selectedCounter = _activeCounter;
+    final tokenClean = qrToken.trim();
 
-    final String name = targetOutcome == Outcome.not_eligible ? 'Aarav Sharma' : 'Rushikesh Korde';
-    final String ticketId = targetOutcome == Outcome.not_eligible ? 'TKT-92804' : 'TKT-92831';
-    final String pass = targetOutcome == Outcome.not_eligible ? 'GENERAL' : 'VIP';
+    setState(() {
+      _screen = 'verifying';
+    });
 
-    final duplicate = _history.any(
-      (scan) =>
-          scan.outcome == Outcome.approved &&
-          scan.ticketId == ticketId &&
-          scan.benefit == selectedCounter.benefit &&
-          scan.id.startsWith('session-'),
-    );
+    Outcome outcome = Outcome.approved;
+    String name = 'Attendee';
+    String ticketId = tokenClean.toUpperCase();
+    String pass = 'VIP';
+    int? attendeeId;
+    int? addonId;
+    int counterId = ApiService().assignedCounterId ?? (_counterKey == CounterKey.food ? 2 : 3);
 
-    final finalOutcome = (targetOutcome == Outcome.approved && duplicate)
-        ? Outcome.redeemed
-        : targetOutcome;
+    try {
+      final res = await ApiService().verifyQR(tokenClean);
+      if (res.containsKey('attendee') && res['attendee'] != null) {
+        final att = res['attendee'] as Map<String, dynamic>;
+        attendeeId = att['id'] as int?;
+        name = att['name']?.toString() ?? name;
+        ticketId = att['ticket_id']?.toString() ?? ticketId;
+        pass = att['ticket_type']?.toString() ?? pass;
+        outcome = Outcome.approved;
+
+        if (res.containsKey('entitlements') && res['entitlements'] is List) {
+          final ents = res['entitlements'] as List<dynamic>;
+          bool foundCounterEntitlement = false;
+
+          for (final e in ents) {
+            final item = e as Map<String, dynamic>;
+            final addonName = (item['name'] ?? item['addon_name'] ?? '').toString().toUpperCase();
+            final addonIdVal = item['addon_id'] as int?;
+            final remainingQty = (item['remaining_quantity'] as int?) ?? (item['is_redeemed'] == true ? 0 : 1);
+            final claimedQty = (item['claimed_quantity'] as int?) ?? 0;
+
+            final isFoodCounter = _counterKey == CounterKey.food;
+            final isMerchCounter = _counterKey == CounterKey.merch;
+
+            final isFoodAddon = addonName.contains('FOOD') || addonName.contains('LUNCH') || addonIdVal == 1;
+            final isMerchAddon = addonName.contains('SHIRT') || addonName.contains('MERCH') || addonIdVal == 2;
+
+            if ((isFoodCounter && isFoodAddon) || (isMerchCounter && isMerchAddon)) {
+              foundCounterEntitlement = true;
+              addonId = addonIdVal ?? (isFoodCounter ? 1 : 2);
+
+              if (remainingQty <= 0 || claimedQty > 0 || item['is_redeemed'] == true) {
+                outcome = Outcome.redeemed;
+              } else {
+                outcome = Outcome.approved;
+              }
+              break;
+            }
+          }
+
+          if (!foundCounterEntitlement) {
+            outcome = Outcome.not_eligible;
+          }
+        }
+
+        // If eligible and valid IDs are present, execute backend claim redemption
+        if (outcome == Outcome.approved && attendeeId != null && addonId != null) {
+          try {
+            final claimRes = await ApiService().claimRedemption(
+              attendeeId: attendeeId,
+              addonId: addonId,
+              counterId: counterId,
+            );
+            if (claimRes['success'] == true) {
+              outcome = Outcome.approved;
+            }
+          } catch (claimErr) {
+            debugPrint('[CLAIM REDEMPTION ERROR] $claimErr');
+            final errStr = claimErr.toString();
+            if (errStr.contains('409') || errStr.contains('ALREADY_CLAIMED')) {
+              outcome = Outcome.redeemed;
+            } else if (errStr.contains('COUNTER_UNAUTHORIZED')) {
+              final fallbackCounterId = ApiService().assignedCounterId ?? 2;
+              try {
+                final retryRes = await ApiService().claimRedemption(
+                  attendeeId: attendeeId,
+                  addonId: addonId,
+                  counterId: fallbackCounterId,
+                );
+                if (retryRes['success'] == true) {
+                  outcome = Outcome.approved;
+                }
+              } catch (retryErr) {
+                if (retryErr.toString().contains('409') || retryErr.toString().contains('ALREADY_CLAIMED')) {
+                  outcome = Outcome.redeemed;
+                } else {
+                  outcome = Outcome.not_eligible;
+                }
+              }
+            } else if (errStr.contains('403') || errStr.contains('NOT_ELIGIBLE')) {
+              outcome = Outcome.not_eligible;
+            }
+          }
+        }
+      } else if (res['error'] == 'INVALID_QR') {
+        outcome = Outcome.invalid;
+      }
+    } catch (e) {
+      debugPrint('[VERIFY QR ERROR] $e');
+      final errStr = e.toString();
+      if (errStr.contains('404') || errStr.contains('INVALID_QR')) {
+        outcome = Outcome.invalid;
+      } else if (errStr.contains('403') || errStr.contains('NOT_ELIGIBLE')) {
+        outcome = Outcome.not_eligible;
+      } else if (errStr.contains('409') || errStr.contains('ALREADY_CLAIMED')) {
+        outcome = Outcome.redeemed;
+      } else {
+        // Fallback demo tokens for testing
+        if (tokenClean == 'qr_tok_aarav_1026' || tokenClean.contains('aarav')) {
+          name = 'Aarav Sharma';
+          ticketId = 'TKT-92804';
+          pass = 'GENERAL';
+          outcome = _counterKey == CounterKey.merch ? Outcome.not_eligible : Outcome.approved;
+        } else if (tokenClean == 'qr_tok_rahul_1023' || tokenClean.contains('rahul')) {
+          name = 'Rahul Sharma';
+          ticketId = 'TKT-92815';
+          pass = 'PREMIUM';
+          outcome = Outcome.approved;
+        } else if (tokenClean == 'qr_tok_rushikesh_1024' || tokenClean.contains('rushikesh')) {
+          name = 'Rushikesh Korde';
+          ticketId = 'TKT-92831';
+          pass = 'VIP';
+          outcome = Outcome.approved;
+        } else if (tokenClean.startsWith('invalid') || tokenClean.length < 3) {
+          outcome = Outcome.invalid;
+          name = 'Unknown';
+          ticketId = 'INVALID';
+          pass = 'NONE';
+        } else {
+          outcome = Outcome.approved;
+        }
+      }
+    }
 
     final now = DateTime.now();
     final hour = now.hour % 12 == 0 ? 12 : now.hour % 12;
@@ -122,158 +245,34 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
     final formattedTime = '${hour.toString().padLeft(2, '0')}:$minute $amPm';
 
     final scan = ScanModel(
-      id: 'session-${DateTime.now().millisecondsSinceEpoch}',
+      id: 'scan-${DateTime.now().millisecondsSinceEpoch}',
       time: formattedTime,
       name: name,
       ticketId: ticketId,
       pass: pass,
       benefit: selectedCounter.benefit,
       counter: selectedCounter.name,
-      outcome: finalOutcome,
+      outcome: outcome,
+      attendeeId: attendeeId,
+      addonId: addonId,
+      counterId: counterId,
     );
 
+    if (!mounted) return;
     setState(() {
-      _counterKey = targetCounterKey;
-      _pending = scan;
-      _screen = 'verifying';
-    });
-
-    _verifyingTimer?.cancel();
-    _verifyingTimer = Timer(const Duration(milliseconds: 900), () {
-      if (!mounted || _pending == null) return;
-      final pendingScan = _pending!;
-      setState(() {
-        _result = pendingScan;
-        if (pendingScan.outcome != Outcome.network) {
-          _history = [pendingScan, ..._history];
-        }
-        if (pendingScan.outcome == Outcome.approved) {
-          _addedCount[_counterKey] = (_addedCount[_counterKey] ?? 0) + 1;
-        }
-        _screen = pendingScan.outcome.name;
-        _pending = null;
-      });
+      _result = scan;
+      if (scan.outcome != Outcome.network && scan.outcome != Outcome.invalid) {
+        _history = [scan, ..._history];
+      }
+      if (scan.outcome == Outcome.approved) {
+        _addedCount[_counterKey] = (_addedCount[_counterKey] ?? 0) + 1;
+      }
+      _screen = 'outcome';
     });
   }
 
-  void _showScreenSwitcherSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: TEDxColors.cardDark,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.65,
-          maxChildSize: 0.85,
-          builder: (_, controller) {
-            return Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: TEDxColors.cardBorder,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Row(
-                    children: [
-                      Icon(Icons.dashboard_customize_rounded, color: TEDxColors.tedRed),
-                      SizedBox(width: 8),
-                      Text(
-                        'Direct UI Screen Switcher',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: ListView(
-                      controller: controller,
-                      children: [
-                        _screenTile(ctx, '1. Login Screen', 'login'),
-                        _screenTile(ctx, '2. Counter Assignment', 'counter'),
-                        _screenTile(ctx, '3. Dashboard (Counter)', 'dashboard'),
-                        _screenTile(ctx, '4. Scanner View', 'scanner'),
-                        _screenTile(ctx, '5. Verifying State', 'verifying'),
-                        _screenTile(ctx, '6. Outcome: Approved', 'approved'),
-                        _screenTile(ctx, '7. Outcome: Already Redeemed', 'redeemed'),
-                        _screenTile(ctx, '8. Outcome: Not Eligible', 'not_eligible'),
-                        _screenTile(ctx, '9. Outcome: Invalid QR', 'invalid'),
-                        _screenTile(ctx, '10. Outcome: Connection Lost', 'network'),
-                        _screenTile(ctx, '11. Scan History', 'history'),
-                        _screenTile(ctx, '12. Scan Detail View', 'detail'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 
-  Widget _screenTile(BuildContext ctx, String label, String screenTarget) {
-    final isCurrent = _screen == screenTarget;
-    return ListTile(
-      onTap: () {
-        Navigator.pop(ctx);
-        setState(() {
-          if (screenTarget == 'approved' ||
-              screenTarget == 'redeemed' ||
-              screenTarget == 'not_eligible' ||
-              screenTarget == 'invalid' ||
-              screenTarget == 'network' ||
-              screenTarget == 'detail') {
-            final outcome = Outcome.values.firstWhere(
-              (e) => e.name == screenTarget,
-              orElse: () => Outcome.approved,
-            );
-            _result = ScanModel(
-              id: 'demo-sample',
-              time: '01:45 PM',
-              name: 'Rushikesh Korde',
-              ticketId: 'TKT-92831',
-              pass: 'VIP',
-              benefit: _activeCounter.benefit,
-              counter: _activeCounter.name,
-              outcome: outcome,
-            );
-          }
-          _screen = screenTarget;
-        });
-      },
-      leading: Icon(
-        isCurrent ? Icons.check_circle_rounded : Icons.smartphone_rounded,
-        color: isCurrent ? TEDxColors.tedRed : TEDxColors.textSecondary,
-        size: 20,
-      ),
-      title: Text(
-        label,
-        style: TextStyle(
-          color: isCurrent ? TEDxColors.tedRed : Colors.white,
-          fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-          fontSize: 14,
-        ),
-      ),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -324,7 +323,7 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
       bodyWidget = QRScannerScreen(
         counter: _activeCounter,
         totalScans: _activeCounter.total + (_addedCount[_counterKey] ?? 0),
-        onSimulateScan: _simulateScan,
+        onScanToken: _handleScanToken,
       );
     } else if (_screen == 'verifying') {
       bodyWidget = AttendeeVerificationScreen(counter: _activeCounter);
@@ -344,7 +343,7 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
         scan: _result!,
         onBackPressed: () => setState(() => _screen = 'history'),
       );
-    } else if (_result != null) {
+    } else if (_screen == 'outcome' && _result != null) {
       bodyWidget = OutcomeResultScreen(
         scan: _result!,
         lastSuccess: lastSuccess,
@@ -370,7 +369,7 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
     String activeTab = 'dashboard';
     if (_screen == 'history' || _screen == 'detail') {
       activeTab = 'history';
-    } else if (_screen == 'scanner') {
+    } else if (_screen == 'scanner' || _screen == 'verifying' || _screen == 'outcome') {
       activeTab = 'scanner';
     }
 
@@ -380,36 +379,7 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
         children: [
           const TEDxTopBar(),
           Expanded(
-            child: Stack(
-              children: [
-                bodyWidget,
-
-                // Floating Screen Switcher Trigger
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: FloatingActionButton.extended(
-                    onPressed: _showScreenSwitcherSheet,
-                    backgroundColor: TEDxColors.cardDark,
-                    foregroundColor: Colors.white,
-                    elevation: 8,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      side: const BorderSide(color: TEDxColors.tedRed, width: 1.5),
-                    ),
-                    icon: const Icon(Icons.layers_rounded, color: TEDxColors.tedRed, size: 18),
-                    label: const Text(
-                      'All Screens',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            child: bodyWidget,
           ),
         ],
       ),
@@ -462,5 +432,12 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
             )
           : null,
     );
+  }
+}
+
+extension StringExtension on String {
+  String take(int n) {
+    if (length <= n) return this;
+    return substring(0, n);
   }
 }

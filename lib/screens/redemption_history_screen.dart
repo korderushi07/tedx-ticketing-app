@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tedx_components.dart';
 import '../models/app_models.dart';
+import '../services/api_service.dart';
 
 class RedemptionHistoryScreen extends StatefulWidget {
   final CounterInfo counter;
@@ -21,10 +22,54 @@ class RedemptionHistoryScreen extends StatefulWidget {
 
 class _RedemptionHistoryScreenState extends State<RedemptionHistoryScreen> {
   FilterOption _filter = FilterOption.all;
+  List<ScanModel> _liveHistory = [];
+  bool _isLoadingHistory = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLiveHistory();
+  }
+
+  Future<void> _fetchLiveHistory() async {
+    setState(() => _isLoadingHistory = true);
+    try {
+      final logs = await ApiService().getMyHistory();
+      if (mounted) {
+        final parsed = logs.map((item) {
+          final m = item as Map<String, dynamic>;
+          final attName = m['attendee_name']?.toString() ?? 'Attendee';
+          final addonName = m['addon_name']?.toString() ?? 'Addon';
+          final counterName = m['counter_name']?.toString() ?? widget.counter.name;
+
+          return ScanModel(
+            id: 'history-${m['id']}',
+            time: 'Just now',
+            name: attName,
+            ticketId: 'TKT-${m['attendee_id']}',
+            pass: 'VERIFIED',
+            benefit: addonName,
+            counter: counterName,
+            outcome: Outcome.approved,
+          );
+        }).toList();
+
+        setState(() {
+          _liveHistory = parsed;
+          _isLoadingHistory = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingHistory = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final scopedHistory = widget.history.where(
+    final allItems = [..._liveHistory, ...widget.history];
+    final scopedHistory = allItems.where(
       (scan) => scan.counter == widget.counter.name,
     ).toList();
 
@@ -62,10 +107,18 @@ class _RedemptionHistoryScreenState extends State<RedemptionHistoryScreen> {
               const SizedBox(height: 16),
 
               // Scan List
-              ScanListWidget(
-                scans: filtered,
-                onSelect: widget.onSelectScan,
-              ),
+              if (_isLoadingHistory)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: CircularProgressIndicator(color: TEDxColors.tedRed),
+                  ),
+                )
+              else
+                ScanListWidget(
+                  scans: filtered,
+                  onSelect: widget.onSelectScan,
+                ),
               const SizedBox(height: 16),
 
               const Center(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tedx_components.dart';
+import '../services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onContinue;
@@ -15,14 +16,41 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController(text: 'rahul@volunteer.tedxnagpur.in');
   final _pinController = TextEditingController(text: '1234');
   String _errorMsg = '';
+  bool _isLoading = false;
 
-  void _handleSubmit() {
-    if (_emailController.text.trim().isEmpty || _pinController.text.trim().isEmpty) {
+  Future<void> _handleSubmit() async {
+    final email = _emailController.text.trim();
+    final password = _pinController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
       setState(() => _errorMsg = 'Enter your volunteer ID and PIN to continue.');
       return;
     }
-    setState(() => _errorMsg = '');
-    widget.onContinue();
+
+    setState(() {
+      _isLoading = true;
+      _errorMsg = '';
+    });
+
+    try {
+      final res = await ApiService().login(email, password);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (res.containsKey('access_token')) {
+          widget.onContinue();
+        } else {
+          setState(() => _errorMsg = res['message']?.toString() ?? 'Login failed');
+        }
+      }
+    } catch (e) {
+      debugPrint('[LOGIN EXCEPTION] $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMsg = 'API Connection Error: $e';
+        });
+      }
+    }
   }
 
   @override
@@ -157,9 +185,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                     const SizedBox(height: 24),
                     ActionButton(
-                      text: 'CONTINUE',
-                      trailingArrow: '→',
-                      onPressed: _handleSubmit,
+                      text: _isLoading ? 'SIGNING IN...' : 'CONTINUE',
+                      trailingArrow: _isLoading ? null : '→',
+                      onPressed: _isLoading ? null : _handleSubmit,
                     ),
                     const SizedBox(height: 12),
                     const Center(
@@ -169,66 +197,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: TEDxColors.textMuted,
                           fontSize: 11,
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Demo Access Banner
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: TEDxColors.inputBg,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: TEDxColors.cardBorder),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'EXPLORING THE PROTOTYPE?',
-                      style: TextStyle(
-                        color: TEDxColors.textMuted,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: widget.onContinue,
-                      child: const Row(
-                        children: [
-                          Text(
-                            'Use demo volunteer access',
-                            style: TextStyle(
-                              color: TEDxColors.tedRed,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            '→',
-                            style: TextStyle(
-                              color: TEDxColors.tedRed,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'No account or credentials required.',
-                      style: TextStyle(
-                        color: TEDxColors.textMuted,
-                        fontSize: 11,
                       ),
                     ),
                   ],
