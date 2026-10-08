@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 
@@ -8,12 +9,31 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._internal();
 
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
   String? _authToken;
   int? assignedCounterId;
 
-  void setAuthToken(String? token) {
+  Future<void> initToken() async {
+    try {
+      _authToken = await _storage.read(key: 'jwt_token');
+      debugPrint('[ApiService] Restored token from secure storage: ${_authToken != null ? "Token present" : "None"}');
+    } catch (e) {
+      debugPrint('[ApiService] Failed to read secure storage: $e');
+    }
+  }
+
+  Future<void> setAuthToken(String? token) async {
     _authToken = token;
-    debugPrint('[ApiService] Auth token updated: ${_authToken != null ? "Token set" : "No token"}');
+    try {
+      if (token != null) {
+        await _storage.write(key: 'jwt_token', value: token);
+      } else {
+        await _storage.delete(key: 'jwt_token');
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Secure storage write error: $e');
+    }
+    debugPrint('[ApiService] Auth token updated in secure storage');
   }
 
   Map<String, String> _getHeaders() {
@@ -61,7 +81,7 @@ class ApiService {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       
       if (response.statusCode == 200 && data.containsKey('access_token')) {
-        setAuthToken(data['access_token'] as String);
+        await setAuthToken(data['access_token'] as String);
         if (data.containsKey('volunteer') && data['volunteer'] is Map) {
           final vol = data['volunteer'] as Map<String, dynamic>;
           assignedCounterId = vol['counter_id'] as int?;
@@ -78,7 +98,8 @@ class ApiService {
 
   /// Verify Attendee QR Code
   Future<Map<String, dynamic>> verifyQR(String qrToken) async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/attendees/qr/$qrToken');
+    final encodedToken = Uri.encodeComponent(qrToken);
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/attendees/qr/$encodedToken');
     debugPrint('[API REQUEST] GET $url');
 
     try {
@@ -88,7 +109,16 @@ class ApiService {
       ).timeout(const Duration(seconds: 8));
 
       debugPrint('[API RESPONSE] Status ${response.statusCode}: ${response.body}');
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 404) {
+        return {
+          'error': 'INVALID_QR',
+          'message': body['message'] ?? 'This QR code is not registered with TEDx.',
+        };
+      }
+      
+      return body;
     } catch (e) {
       debugPrint('[API ERROR] GET $url failed: $e');
       rethrow;
@@ -140,6 +170,28 @@ class ApiService {
     } catch (e) {
       debugPrint('[API ERROR] GET $url failed: $e');
       rethrow;
+    }
+  }
+
+  /// Get Counter Statistics from Database
+  Future<Map<String, dynamic>> getCounterStats(int counterId) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/counters/$counterId/stats');
+    debugPrint('[API REQUEST] GET $url');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: _getHeaders(),
+      ).timeout(const Duration(seconds: 8));
+
+      debugPrint('[API RESPONSE] Status ${response.statusCode}: ${response.body}');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return {};
+    } catch (e) {
+      debugPrint('[API ERROR] GET $url failed: $e');
+      return {};
     }
   }
 }

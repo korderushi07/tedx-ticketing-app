@@ -12,7 +12,7 @@ class TEDxTopBar extends StatelessWidget {
       decoration: const BoxDecoration(
         color: TEDxColors.bgDark,
         border: Border(
-          bottom: BorderSide(color: TEDxColors.cardBorder, width: 1),
+          bottom: BorderSide(color: Color(0xFF222225), width: 1),
         ),
       ),
       child: SafeArea(
@@ -21,44 +21,36 @@ class TEDxTopBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             RichText(
-              text: const TextSpan(
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, fontFamily: 'sans-serif'),
+              text: TextSpan(
+                style: AppFonts.heading(fontSize: 17, fontWeight: FontWeight.w800),
                 children: [
                   TextSpan(
                     text: 'TEDx',
-                    style: TextStyle(color: TEDxColors.tedRed, fontWeight: FontWeight.w900),
+                    style: AppFonts.heading(color: TEDxColors.tedRed, fontWeight: FontWeight.w900),
                   ),
-                  TextSpan(text: ' Nagpur ', style: TextStyle(color: Colors.white)),
+                  TextSpan(text: ' Nagpur ', style: AppFonts.heading(color: Colors.white, fontWeight: FontWeight.w800)),
                   TextSpan(
                     text: '2026',
-                    style: TextStyle(color: TEDxColors.textMuted, fontSize: 13, fontWeight: FontWeight.w600),
+                    style: AppFonts.heading(color: const Color(0xFF71717A), fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: TEDxColors.tedRedSubtle,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: TEDxColors.tedRed.withValues(alpha: 0.3)),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.fiber_manual_record, size: 8, color: TEDxColors.tedRed),
-                  SizedBox(width: 6),
-                  Text(
-                    'EVENT LIVE',
-                    style: TextStyle(
-                      color: TEDxColors.tedRed,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.0,
-                    ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.fiber_manual_record, size: 7, color: Color(0xFF10B981)),
+                const SizedBox(width: 6),
+                Text(
+                  'EVENT LIVE',
+                  style: AppFonts.mono(
+                    color: const Color(0xFF8E8E93),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ],
         ),
@@ -112,7 +104,7 @@ class ActionButton extends StatelessWidget {
               if (icon != null) ...[icon!, const SizedBox(width: 8)],
               Text(
                 text,
-                style: const TextStyle(
+                style: AppFonts.body(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.3,
@@ -122,7 +114,7 @@ class ActionButton extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   trailingArrow!,
-                  style: const TextStyle(color: TEDxColors.textMuted, fontSize: 16),
+                  style: AppFonts.body(color: TEDxColors.textMuted, fontSize: 16),
                 ),
               ],
             ],
@@ -155,7 +147,7 @@ class ActionButton extends StatelessWidget {
                 children: [
                   Text(
                     text,
-                    style: const TextStyle(
+                    style: AppFonts.body(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.6,
@@ -168,7 +160,7 @@ class ActionButton extends StatelessWidget {
             if (trailingArrow != null)
               Text(
                 trailingArrow!,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                style: AppFonts.body(fontSize: 18, fontWeight: FontWeight.w700),
               ),
           ],
         ),
@@ -196,7 +188,7 @@ class SectionHeading extends StatelessWidget {
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: AppFonts.mono(
             color: TEDxColors.tedRed,
             fontSize: 11,
             fontWeight: FontWeight.w800,
@@ -206,7 +198,7 @@ class SectionHeading extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           title,
-          style: const TextStyle(
+          style: AppFonts.heading(
             color: TEDxColors.textPrimary,
             fontSize: 26,
             fontWeight: FontWeight.w800,
@@ -217,7 +209,7 @@ class SectionHeading extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             support!,
-            style: const TextStyle(
+            style: AppFonts.body(
               color: TEDxColors.textSecondary,
               fontSize: 14,
               height: 1.3,
@@ -246,6 +238,11 @@ class MetadataList extends StatelessWidget {
       child: Column(
         children: rows.map((entry) {
           final isLast = entry == rows.last;
+          final isCodeOrId = entry.key.toLowerCase().contains('id') ||
+              entry.key.toLowerCase().contains('code') ||
+              entry.key.toLowerCase().contains('time') ||
+              entry.key.toLowerCase().contains('counter');
+
           return Column(
             children: [
               Padding(
@@ -255,7 +252,7 @@ class MetadataList extends StatelessWidget {
                   children: [
                     Text(
                       entry.key,
-                      style: const TextStyle(
+                      style: AppFonts.body(
                         color: TEDxColors.textMuted,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -263,11 +260,17 @@ class MetadataList extends StatelessWidget {
                     ),
                     Text(
                       entry.value,
-                      style: const TextStyle(
-                        color: TEDxColors.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: isCodeOrId
+                          ? AppFonts.mono(
+                              color: TEDxColors.textPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            )
+                          : AppFonts.body(
+                              color: TEDxColors.textPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
                     ),
                   ],
                 ),
@@ -296,29 +299,24 @@ class ScanListWidget extends StatelessWidget {
     if (scans.isEmpty) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-        decoration: BoxDecoration(
-          color: TEDxColors.cardDark,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: TEDxColors.cardBorder),
-        ),
-        child: const Column(
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+        child: Column(
           children: [
-            Icon(Icons.qr_code_scanner_rounded, size: 36, color: TEDxColors.textMuted),
-            SizedBox(height: 12),
+            const Icon(Icons.qr_code_scanner_rounded, size: 32, color: Color(0xFF71717A)),
+            const SizedBox(height: 10),
             Text(
-              'No scans to show',
-              style: TextStyle(
-                color: TEDxColors.textPrimary,
+              'No scans yet today',
+              style: AppFonts.heading(
+                color: Colors.white,
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text(
-              'Scan records will appear here.',
-              style: TextStyle(
-                color: TEDxColors.textSecondary,
+              'Scan records will appear here live.',
+              style: AppFonts.body(
+                color: const Color(0xFFA1A1AA),
                 fontSize: 12,
               ),
             ),
@@ -328,100 +326,105 @@ class ScanListWidget extends StatelessWidget {
     }
 
     return Column(
-      children: scans.map((scan) {
+      children: scans.asMap().entries.map((entry) {
+        final index = entry.key;
+        final scan = entry.value;
         final isApproved = scan.outcome == Outcome.approved;
         final markColor = isApproved ? TEDxColors.success : TEDxColors.error;
-        final markBg = isApproved ? TEDxColors.successBg : TEDxColors.errorBg;
         final markIcon = isApproved ? '✓' : '×';
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
+        return Column(
+          children: [
+            InkWell(
               onTap: () => onSelect(scan),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: TEDxColors.cardDark,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: TEDxColors.cardBorder),
-                ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: markBg,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          markIcon,
-                          style: TextStyle(
-                            color: markColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                          ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2, right: 12),
+                      child: Text(
+                        markIcon,
+                        style: TextStyle(
+                          color: markColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             scan.name,
-                            style: const TextStyle(
-                              color: TEDxColors.textPrimary,
+                            style: AppFonts.heading(
+                              color: Colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${scan.ticketId} · ${scan.benefit}',
-                            style: const TextStyle(
-                              color: TEDxColors.textSecondary,
-                              fontSize: 12,
+                          const SizedBox(height: 3),
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: scan.ticketId,
+                                  style: AppFonts.mono(
+                                    color: const Color(0xFFA1A1AA),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: '  ·  ${scan.benefit}',
+                                  style: AppFonts.body(
+                                    color: const Color(0xFFA1A1AA),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 3),
                           Text(
                             getOutcomeLabel(scan.outcome),
-                            style: TextStyle(
+                            style: AppFonts.mono(
                               color: markColor,
                               fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Text(
-                      scan.time,
-                      style: const TextStyle(
-                        color: TEDxColors.textMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      '›',
-                      style: TextStyle(
-                        color: TEDxColors.textMuted,
-                        fontSize: 18,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          scan.time,
+                          style: AppFonts.mono(
+                            color: const Color(0xFF71717A),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '>',
+                          style: AppFonts.mono(
+                            color: const Color(0xFF71717A),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-          ),
+            if (index < scans.length - 1)
+              const Divider(color: Color(0xFF1F1F23), height: 1),
+          ],
         );
       }).toList(),
     );

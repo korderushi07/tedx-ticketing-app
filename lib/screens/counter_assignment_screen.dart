@@ -53,7 +53,7 @@ class CounterAssignmentScreen extends StatelessWidget {
                           ),
                           child: Text(
                             counter.code,
-                            style: const TextStyle(
+                            style: AppFonts.mono(
                               color: Colors.white,
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
@@ -61,35 +61,12 @@ class CounterAssignmentScreen extends StatelessWidget {
                             ),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: TEDxColors.successBg,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: TEDxColors.successBorder.withValues(alpha: 0.4)),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.fiber_manual_record, size: 8, color: TEDxColors.success),
-                              SizedBox(width: 6),
-                              Text(
-                                'Ready for attendees',
-                                style: TextStyle(
-                                  color: TEDxColors.success,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'YOUR ASSIGNED COUNTER',
-                      style: TextStyle(
+                      style: AppFonts.mono(
                         color: TEDxColors.textMuted,
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
@@ -99,7 +76,7 @@ class CounterAssignmentScreen extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       counter.name,
-                      style: const TextStyle(
+                      style: AppFonts.heading(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
@@ -109,7 +86,7 @@ class CounterAssignmentScreen extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${counter.benefit} redemption · Ground floor',
-                      style: const TextStyle(
+                      style: AppFonts.body(
                         color: TEDxColors.textSecondary,
                         fontSize: 13,
                       ),
@@ -132,9 +109,9 @@ class CounterAssignmentScreen extends StatelessWidget {
                     CircleAvatar(
                       radius: 20,
                       backgroundColor: TEDxColors.tedRed,
-                      child: const Text(
+                      child: Text(
                         'RS',
-                        style: TextStyle(
+                        style: AppFonts.heading(
                           color: Colors.white,
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
@@ -142,23 +119,36 @@ class CounterAssignmentScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 14),
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Rahul Sharma',
-                          style: TextStyle(
+                          style: AppFonts.heading(
                             color: Colors.white,
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        SizedBox(height: 2),
-                        Text(
-                          'VOL–014 · Counter volunteer',
-                          style: TextStyle(
-                            color: TEDxColors.textSecondary,
-                            fontSize: 12,
+                        const SizedBox(height: 2),
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'VOL–014',
+                                style: AppFonts.mono(
+                                  color: TEDxColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              TextSpan(
+                                text: ' · Counter volunteer',
+                                style: AppFonts.body(
+                                  color: TEDxColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -180,9 +170,9 @@ class CounterAssignmentScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'COUNTER PERMISSIONS',
-                      style: TextStyle(
+                      style: AppFonts.mono(
                         color: TEDxColors.textMuted,
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
@@ -207,10 +197,10 @@ class CounterAssignmentScreen extends StatelessWidget {
                 onPressed: onStartScanning,
               ),
               const SizedBox(height: 12),
-              const Center(
+              Center(
                 child: Text(
                   'Assigned by the event operations team',
-                  style: TextStyle(
+                  style: AppFonts.body(
                     color: TEDxColors.textMuted,
                     fontSize: 11,
                   ),
@@ -227,9 +217,9 @@ class CounterAssignmentScreen extends StatelessWidget {
   Widget _permissionRow(String text) {
     return Row(
       children: [
-        const Text(
+        Text(
           '✓',
-          style: TextStyle(
+          style: AppFonts.body(
             color: TEDxColors.success,
             fontWeight: FontWeight.w900,
             fontSize: 14,
@@ -238,7 +228,7 @@ class CounterAssignmentScreen extends StatelessWidget {
         const SizedBox(width: 10),
         Text(
           text,
-          style: const TextStyle(
+          style: AppFonts.body(
             color: TEDxColors.textPrimary,
             fontSize: 13,
             fontWeight: FontWeight.w600,

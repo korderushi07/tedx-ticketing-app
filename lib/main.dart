@@ -52,38 +52,7 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
     CounterKey.merch: 0,
   };
 
-  List<ScanModel> _history = [
-    const ScanModel(
-      id: 'scan-3',
-      time: '01:47 PM',
-      name: 'Rushikesh Korde',
-      ticketId: 'TKT-92831',
-      pass: 'VIP',
-      benefit: 'Lunch',
-      counter: 'Food Counter 01',
-      outcome: Outcome.redeemed,
-    ),
-    const ScanModel(
-      id: 'scan-2',
-      time: '01:44 PM',
-      name: 'Nehal Mehta',
-      ticketId: 'TKT-92842',
-      pass: 'Premium',
-      benefit: 'Lunch',
-      counter: 'Food Counter 01',
-      outcome: Outcome.approved,
-    ),
-    const ScanModel(
-      id: 'scan-1',
-      time: '01:42 PM',
-      name: 'Rushikesh Korde',
-      ticketId: 'TKT-92831',
-      pass: 'VIP',
-      benefit: 'Lunch',
-      counter: 'Food Counter 01',
-      outcome: Outcome.approved,
-    ),
-  ];
+  List<ScanModel> _history = [];
 
   ScanModel? _result;
   Timer? _verifyingTimer;
@@ -206,35 +175,18 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
       final errStr = e.toString();
       if (errStr.contains('404') || errStr.contains('INVALID_QR')) {
         outcome = Outcome.invalid;
+        name = 'Unknown';
+        ticketId = 'INVALID';
+        pass = 'NONE';
       } else if (errStr.contains('403') || errStr.contains('NOT_ELIGIBLE')) {
         outcome = Outcome.not_eligible;
       } else if (errStr.contains('409') || errStr.contains('ALREADY_CLAIMED')) {
         outcome = Outcome.redeemed;
       } else {
-        // Fallback demo tokens for testing
-        if (tokenClean == 'qr_tok_aarav_1026' || tokenClean.contains('aarav')) {
-          name = 'Aarav Sharma';
-          ticketId = 'TKT-92804';
-          pass = 'GENERAL';
-          outcome = _counterKey == CounterKey.merch ? Outcome.not_eligible : Outcome.approved;
-        } else if (tokenClean == 'qr_tok_rahul_1023' || tokenClean.contains('rahul')) {
-          name = 'Rahul Sharma';
-          ticketId = 'TKT-92815';
-          pass = 'PREMIUM';
-          outcome = Outcome.approved;
-        } else if (tokenClean == 'qr_tok_rushikesh_1024' || tokenClean.contains('rushikesh')) {
-          name = 'Rushikesh Korde';
-          ticketId = 'TKT-92831';
-          pass = 'VIP';
-          outcome = Outcome.approved;
-        } else if (tokenClean.startsWith('invalid') || tokenClean.length < 3) {
-          outcome = Outcome.invalid;
-          name = 'Unknown';
-          ticketId = 'INVALID';
-          pass = 'NONE';
-        } else {
-          outcome = Outcome.approved;
-        }
+        outcome = Outcome.invalid;
+        name = 'Unknown';
+        ticketId = 'INVALID';
+        pass = 'NONE';
       }
     }
 
@@ -377,7 +329,7 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
       backgroundColor: TEDxColors.bgDark,
       body: Column(
         children: [
-          const TEDxTopBar(),
+          if (_screen == 'login') const TEDxTopBar(),
           Expanded(
             child: bodyWidget,
           ),
@@ -385,49 +337,117 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
       ),
       bottomNavigationBar: showNav
           ? Container(
+              padding: const EdgeInsets.only(top: 0, bottom: 8),
               decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: TEDxColors.cardBorder, width: 1)),
+                color: TEDxColors.bgDark,
+                border: Border(top: BorderSide(color: Color(0xFF1F1F23), width: 1)),
               ),
-              child: BottomNavigationBar(
-                currentIndex: activeTab == 'dashboard' ? 0 : (activeTab == 'scanner' ? 1 : 2),
-                onTap: (index) {
-                  if (_screen == 'verifying') return;
-                  setState(() {
-                    if (index == 0) {
-                      _screen = 'dashboard';
-                    } else if (index == 1) {
-                      _screen = 'scanner';
-                    } else {
-                      _screen = 'history';
-                    }
-                  });
-                },
-                items: [
-                  const BottomNavigationBarItem(
-                    icon: Icon(Icons.meeting_room_outlined),
-                    activeIcon: Icon(Icons.meeting_room_rounded),
-                    label: 'Counter',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: activeTab == 'scanner' ? TEDxColors.tedRed : TEDxColors.tedRedSubtle,
-                        shape: BoxShape.circle,
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  height: 48,
+                  child: Row(
+                    children: [
+                      // Counter Tab
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            if (_screen != 'verifying') setState(() => _screen = 'dashboard');
+                          },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                height: 2,
+                                width: 36,
+                                color: activeTab == 'dashboard' ? TEDxColors.tedRed : Colors.transparent,
+                              ),
+                              const Spacer(),
+                              Text(
+                                'Counter',
+                                style: AppFonts.body(
+                                  color: activeTab == 'dashboard' ? Colors.white : const Color(0xFF71717A),
+                                  fontSize: 13,
+                                  fontWeight: activeTab == 'dashboard' ? FontWeight.w700 : FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: Icon(
-                        Icons.qr_code_scanner_rounded,
-                        color: activeTab == 'scanner' ? Colors.white : TEDxColors.tedRed,
-                        size: 20,
+
+                      // Scan Tab
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            if (_screen != 'verifying') setState(() => _screen = 'scanner');
+                          },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                height: 2,
+                                width: 36,
+                                color: activeTab == 'scanner' ? TEDxColors.tedRed : Colors.transparent,
+                              ),
+                              const Spacer(),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.qr_code_scanner_rounded,
+                                    size: 16,
+                                    color: activeTab == 'scanner' ? Colors.white : const Color(0xFF71717A),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Scan',
+                                    style: AppFonts.body(
+                                      color: activeTab == 'scanner' ? Colors.white : const Color(0xFF71717A),
+                                      fontSize: 13,
+                                      fontWeight: activeTab == 'scanner' ? FontWeight.w700 : FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                    label: 'Scan',
+
+                      // History Tab
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            if (_screen != 'verifying') setState(() => _screen = 'history');
+                          },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                height: 2,
+                                width: 36,
+                                color: activeTab == 'history' ? TEDxColors.tedRed : Colors.transparent,
+                              ),
+                              const Spacer(),
+                              Text(
+                                'History',
+                                style: AppFonts.body(
+                                  color: activeTab == 'history' ? Colors.white : const Color(0xFF71717A),
+                                  fontSize: 13,
+                                  fontWeight: activeTab == 'history' ? FontWeight.w700 : FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const BottomNavigationBarItem(
-                    icon: Icon(Icons.history_rounded),
-                    label: 'History',
-                  ),
-                ],
+                ),
               ),
             )
           : null,

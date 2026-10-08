@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class TEDxColors {
   // Brand
@@ -32,9 +33,62 @@ class TEDxColors {
   static const Color errorBorder = Color(0xFFDC2626);
 }
 
+class AppFonts {
+  /// DM Sans — headings, attendee names, and prominent numbers
+  static TextStyle heading({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? letterSpacing,
+    double? height,
+  }) {
+    return GoogleFonts.dmSans(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: letterSpacing,
+      height: height,
+    );
+  }
+
+  /// Inter — body text, buttons, labels, and navigation
+  static TextStyle body({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? letterSpacing,
+    double? height,
+  }) {
+    return GoogleFonts.inter(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: letterSpacing,
+      height: height,
+    );
+  }
+
+  /// JetBrains Mono — ticket IDs, timestamps, counter codes, and operational metadata
+  static TextStyle mono({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? letterSpacing,
+    double? height,
+  }) {
+    return GoogleFonts.jetBrainsMono(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: letterSpacing,
+      height: height,
+    );
+  }
+}
+
 class TEDxTheme {
   static ThemeData get darkTheme {
-    return ThemeData(
+    final baseTheme = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: TEDxColors.bgDark,
@@ -46,12 +100,16 @@ class TEDxTheme {
         onPrimary: Colors.white,
         onSurface: TEDxColors.textPrimary,
       ),
-      appBarTheme: const AppBarTheme(
+    );
+
+    return baseTheme.copyWith(
+      textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme),
+      appBarTheme: AppBarTheme(
         backgroundColor: TEDxColors.bgDark,
         elevation: 0,
         centerTitle: false,
-        iconTheme: IconThemeData(color: TEDxColors.textPrimary),
-        titleTextStyle: TextStyle(
+        iconTheme: const IconThemeData(color: TEDxColors.textPrimary),
+        titleTextStyle: GoogleFonts.dmSans(
           color: TEDxColors.textPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
@@ -75,7 +133,7 @@ class TEDxTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: const TextStyle(
+          textStyle: GoogleFonts.inter(
             fontSize: 15,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.8,
@@ -90,7 +148,7 @@ class TEDxTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: const TextStyle(
+          textStyle: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w700,
           ),
@@ -112,17 +170,17 @@ class TEDxTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: TEDxColors.tedRed, width: 1.5),
         ),
-        labelStyle: const TextStyle(color: TEDxColors.textSecondary),
-        hintStyle: const TextStyle(color: TEDxColors.textMuted),
+        labelStyle: GoogleFonts.inter(color: TEDxColors.textSecondary),
+        hintStyle: GoogleFonts.inter(color: TEDxColors.textMuted),
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: TEDxColors.bgDark,
         selectedItemColor: TEDxColors.tedRed,
         unselectedItemColor: TEDxColors.textMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
-        selectedLabelStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-        unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+        selectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12),
+        unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 12),
       ),
     );
   }
