@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'theme/app_theme.dart';
 import 'models/app_models.dart';
 import 'widgets/tedx_components.dart';
 import 'services/api_service.dart';
+import 'providers/redemption_providers.dart';
 
 // Screens
 import 'screens/login_screen.dart';
@@ -19,7 +21,7 @@ import 'screens/redemption_history_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
-  runApp(const TEDxEventOpsApp());
+  runApp(const ProviderScope(child: TEDxEventOpsApp()));
 }
 
 class TEDxEventOpsApp extends StatelessWidget {
@@ -36,25 +38,29 @@ class TEDxEventOpsApp extends StatelessWidget {
   }
 }
 
-class VolunteerWorkspace extends StatefulWidget {
+class VolunteerWorkspace extends ConsumerStatefulWidget {
   const VolunteerWorkspace({super.key});
 
   @override
-  State<VolunteerWorkspace> createState() => _VolunteerWorkspaceState();
+  ConsumerState<VolunteerWorkspace> createState() => _VolunteerWorkspaceState();
 }
 
-class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
-  String _screen = 'login'; // login, counter, dashboard, scanner, verifying, history, detail, outcome
-  CounterKey _counterKey = CounterKey.food;
+class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
+  String _screen =
+      'login'; // login, counter, dashboard, scanner, verifying, history, detail, outcome
+  CounterInfo _assignedCounter = CounterInfo.food;
+  String _volunteerName = '';
+  String _volunteerCode = '';
+  CounterKey get _counterKey => _assignedCounter.key;
 
   final Map<CounterKey, int> _addedCount = {
     CounterKey.food: 0,
     CounterKey.merch: 0,
+    CounterKey.goodie: 0,
+    CounterKey.workshop: 0,
   };
 
-  List<ScanModel> _history = [];
-
-  ScanModel? _result;
+  ScanModel? _selectedDetailScan;
   Timer? _verifyingTimer;
 
   @override
@@ -63,7 +69,7 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
     super.dispose();
   }
 
-  CounterInfo get _activeCounter => CounterInfo.fromKey(_counterKey);
+  CounterInfo get _activeCounter => _assignedCounter;
 
   Future<void> _handleScanToken(String qrToken) async {
     if (_screen == 'verifying') return;
@@ -75,13 +81,21 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
       _screen = 'verifying';
     });
 
-    Outcome outcome = Outcome.approved;
+    Outcome outcome = Outcome.network;
     String name = 'Attendee';
     String ticketId = tokenClean.toUpperCase();
     String pass = 'VIP';
     int? attendeeId;
     int? addonId;
-    int counterId = ApiService().assignedCounterId ?? (_counterKey == CounterKey.food ? 2 : 3);
+    final counterId = selectedCounter.id;
+    final requiredAddonId = selectedCounter.addonId;
+    if (counterId == null || requiredAddonId == null) {
+      debugPrint(
+        '[SCAN] Cannot process a scan without an assigned counter and add-on.',
+      );
+      setState(() => _screen = 'dashboard');
+      return;
+    }
 
     try {
       final res = await ApiService().verifyQR(tokenClean);
@@ -91,7 +105,6 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
         name = att['name']?.toString() ?? name;
         ticketId = att['ticket_id']?.toString() ?? ticketId;
         pass = att['ticket_type']?.toString() ?? pass;
-        outcome = Outcome.approved;
 
         if (res.containsKey('entitlements') && res['entitlements'] is List) {
           final ents = res['entitlements'] as List<dynamic>;
@@ -99,22 +112,19 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
 
           for (final e in ents) {
             final item = e as Map<String, dynamic>;
-            final addonName = (item['name'] ?? item['addon_name'] ?? '').toString().toUpperCase();
             final addonIdVal = item['addon_id'] as int?;
-            final remainingQty = (item['remaining_quantity'] as int?) ?? (item['is_redeemed'] == true ? 0 : 1);
+            final remainingQty =
+                (item['remaining_quantity'] as int?) ??
+                (item['is_redeemed'] == true ? 0 : 1);
             final claimedQty = (item['claimed_quantity'] as int?) ?? 0;
 
-            final isFoodCounter = _counterKey == CounterKey.food;
-            final isMerchCounter = _counterKey == CounterKey.merch;
-
-            final isFoodAddon = addonName.contains('FOOD') || addonName.contains('LUNCH') || addonIdVal == 1;
-            final isMerchAddon = addonName.contains('SHIRT') || addonName.contains('MERCH') || addonIdVal == 2;
-
-            if ((isFoodCounter && isFoodAddon) || (isMerchCounter && isMerchAddon)) {
+            if (addonIdVal == requiredAddonId) {
               foundCounterEntitlement = true;
-              addonId = addonIdVal ?? (isFoodCounter ? 1 : 2);
+              addonId = addonIdVal;
 
-              if (remainingQty <= 0 || claimedQty > 0 || item['is_redeemed'] == true) {
+              if (remainingQty <= 0 ||
+                  claimedQty > 0 ||
+                  item['is_redeemed'] == true) {
                 outcome = Outcome.redeemed;
               } else {
                 outcome = Outcome.approved;
@@ -124,12 +134,16 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
           }
 
           if (!foundCounterEntitlement) {
-            outcome = Outcome.not_eligible;
+            outcome = Outcome.notEligible;
           }
+        } else {
+          outcome = Outcome.network;
         }
 
         // If eligible and valid IDs are present, execute backend claim redemption
-        if (outcome == Outcome.approved && attendeeId != null && addonId != null) {
+        if (outcome == Outcome.approved &&
+            attendeeId != null &&
+            addonId != null) {
           try {
             final claimRes = await ApiService().claimRedemption(
               attendeeId: attendeeId,
@@ -138,34 +152,31 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
             );
             if (claimRes['success'] == true) {
               outcome = Outcome.approved;
+              // Refresh persistent history provider in Riverpod upon successful redemption claim
+              ref.read(redemptionHistoryProvider.notifier).refresh();
+            } else if (claimRes['error'] == 'ALREADY_CLAIMED') {
+              outcome = Outcome.redeemed;
+            } else if (claimRes['error'] == 'NOT_ELIGIBLE' ||
+                claimRes['error'] == 'COUNTER_UNAUTHORIZED') {
+              outcome = Outcome.notEligible;
+            } else {
+              outcome = Outcome.network;
             }
           } catch (claimErr) {
-            debugPrint('[CLAIM REDEMPTION ERROR] $claimErr');
             final errStr = claimErr.toString();
             if (errStr.contains('409') || errStr.contains('ALREADY_CLAIMED')) {
               outcome = Outcome.redeemed;
             } else if (errStr.contains('COUNTER_UNAUTHORIZED')) {
-              final fallbackCounterId = ApiService().assignedCounterId ?? 2;
-              try {
-                final retryRes = await ApiService().claimRedemption(
-                  attendeeId: attendeeId,
-                  addonId: addonId,
-                  counterId: fallbackCounterId,
-                );
-                if (retryRes['success'] == true) {
-                  outcome = Outcome.approved;
-                }
-              } catch (retryErr) {
-                if (retryErr.toString().contains('409') || retryErr.toString().contains('ALREADY_CLAIMED')) {
-                  outcome = Outcome.redeemed;
-                } else {
-                  outcome = Outcome.not_eligible;
-                }
-              }
-            } else if (errStr.contains('403') || errStr.contains('NOT_ELIGIBLE')) {
-              outcome = Outcome.not_eligible;
+              outcome = Outcome.notEligible;
+            } else if (errStr.contains('403') ||
+                errStr.contains('NOT_ELIGIBLE')) {
+              outcome = Outcome.notEligible;
+            } else {
+              outcome = Outcome.network;
             }
           }
+        } else if (outcome == Outcome.approved) {
+          outcome = Outcome.network;
         }
       } else if (res['error'] == 'INVALID_QR') {
         outcome = Outcome.invalid;
@@ -179,11 +190,11 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
         ticketId = 'INVALID';
         pass = 'NONE';
       } else if (errStr.contains('403') || errStr.contains('NOT_ELIGIBLE')) {
-        outcome = Outcome.not_eligible;
+        outcome = Outcome.notEligible;
       } else if (errStr.contains('409') || errStr.contains('ALREADY_CLAIMED')) {
         outcome = Outcome.redeemed;
       } else {
-        outcome = Outcome.invalid;
+        outcome = Outcome.network;
         name = 'Unknown';
         ticketId = 'INVALID';
         pass = 'NONE';
@@ -211,11 +222,8 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
     );
 
     if (!mounted) return;
+    ref.read(currentScanProvider.notifier).setScan(scan);
     setState(() {
-      _result = scan;
-      if (scan.outcome != Outcome.network && scan.outcome != Outcome.invalid) {
-        _history = [scan, ..._history];
-      }
       if (scan.outcome == Outcome.approved) {
         _addedCount[_counterKey] = (_addedCount[_counterKey] ?? 0) + 1;
       }
@@ -223,22 +231,36 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
     });
   }
 
-
-
+  void _onScanNext() {
+    ref.read(currentScanProvider.notifier).clearScan();
+    setState(() {
+      _screen = 'scanner';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final showNav = _screen != 'login' && _screen != 'counter';
-    final scopedHistory = _history.where((scan) => scan.counter == _activeCounter.name).toList();
+    final historyAsync = ref.watch(redemptionHistoryProvider);
+    final currentScan = ref.watch(currentScanProvider);
+
+    final historyScans = historyAsync.maybeWhen(
+      data: (list) => list,
+      orElse: () => <ScanModel>[],
+    );
+
+    final scopedHistory = historyScans
+        .where((scan) => scan.counter == _activeCounter.name)
+        .toList();
 
     ScanModel? lastSuccess;
-    if (_result != null) {
+    if (currentScan != null) {
       try {
-        lastSuccess = _history.firstWhere(
+        lastSuccess = historyScans.firstWhere(
           (scan) =>
               scan.outcome == Outcome.approved &&
-              scan.ticketId == _result!.ticketId &&
-              scan.benefit == _result!.benefit,
+              scan.ticketId == currentScan.ticketId &&
+              scan.benefit == currentScan.benefit,
         );
       } catch (_) {
         lastSuccess = null;
@@ -249,27 +271,40 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
 
     if (_screen == 'login') {
       bodyWidget = LoginScreen(
-        onContinue: () => setState(() => _screen = 'counter'),
+        onContinue: () {
+          final api = ApiService();
+          final assignedCounter = api.assignedCounter;
+          if (assignedCounter == null) return;
+          setState(() {
+            _assignedCounter = assignedCounter;
+            _volunteerName = api.assignedVolunteerName ?? 'Volunteer';
+            _volunteerCode = api.assignedVolunteerCode ?? '';
+            _screen = 'counter';
+          });
+          ref.read(redemptionHistoryProvider.notifier).refresh();
+        },
       );
     } else if (_screen == 'counter') {
       bodyWidget = CounterAssignmentScreen(
         counter: _activeCounter,
+        volunteerName: _volunteerName,
+        volunteerCode: _volunteerCode,
         onStartScanning: () => setState(() => _screen = 'dashboard'),
       );
     } else if (_screen == 'dashboard') {
       bodyWidget = DashboardScreen(
         counter: _activeCounter,
+        volunteerName: _volunteerName,
         addedCount: _addedCount[_counterKey] ?? 0,
         recentScans: scopedHistory,
         onScanClick: () => setState(() => _screen = 'scanner'),
         onViewHistoryClick: () => setState(() => _screen = 'history'),
         onSelectScan: (scan) {
           setState(() {
-            _result = scan;
+            _selectedDetailScan = scan;
             _screen = 'detail';
           });
         },
-        onSwitchCounter: (key) => setState(() => _counterKey = key),
       );
     } else if (_screen == 'scanner') {
       bodyWidget = QRScannerScreen(
@@ -282,46 +317,47 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
     } else if (_screen == 'history') {
       bodyWidget = RedemptionHistoryScreen(
         counter: _activeCounter,
-        history: _history,
         onSelectScan: (scan) {
           setState(() {
-            _result = scan;
+            _selectedDetailScan = scan;
             _screen = 'detail';
           });
         },
       );
-    } else if (_screen == 'detail' && _result != null) {
+    } else if (_screen == 'detail' && _selectedDetailScan != null) {
       bodyWidget = AttendeeDetailsScreen(
-        scan: _result!,
+        scan: _selectedDetailScan!,
         onBackPressed: () => setState(() => _screen = 'history'),
       );
-    } else if (_screen == 'outcome' && _result != null) {
+    } else if (_screen == 'outcome' && currentScan != null) {
       bodyWidget = OutcomeResultScreen(
-        scan: _result!,
+        scan: currentScan,
         lastSuccess: lastSuccess,
-        onActionClick: () => setState(() => _screen = 'scanner'),
+        onActionClick: _onScanNext,
       );
     } else {
       bodyWidget = DashboardScreen(
         counter: _activeCounter,
+        volunteerName: _volunteerName,
         addedCount: _addedCount[_counterKey] ?? 0,
         recentScans: scopedHistory,
         onScanClick: () => setState(() => _screen = 'scanner'),
         onViewHistoryClick: () => setState(() => _screen = 'history'),
         onSelectScan: (scan) {
           setState(() {
-            _result = scan;
+            _selectedDetailScan = scan;
             _screen = 'detail';
           });
         },
-        onSwitchCounter: (key) => setState(() => _counterKey = key),
       );
     }
 
     String activeTab = 'dashboard';
     if (_screen == 'history' || _screen == 'detail') {
       activeTab = 'history';
-    } else if (_screen == 'scanner' || _screen == 'verifying' || _screen == 'outcome') {
+    } else if (_screen == 'scanner' ||
+        _screen == 'verifying' ||
+        _screen == 'outcome') {
       activeTab = 'scanner';
     }
 
@@ -330,9 +366,7 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
       body: Column(
         children: [
           if (_screen == 'login') const TEDxTopBar(),
-          Expanded(
-            child: bodyWidget,
-          ),
+          Expanded(child: bodyWidget),
         ],
       ),
       bottomNavigationBar: showNav
@@ -340,7 +374,9 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
               padding: const EdgeInsets.only(top: 0, bottom: 8),
               decoration: const BoxDecoration(
                 color: TEDxColors.bgDark,
-                border: Border(top: BorderSide(color: Color(0xFF1F1F23), width: 1)),
+                border: Border(
+                  top: BorderSide(color: Color(0xFF1F1F23), width: 1),
+                ),
               ),
               child: SafeArea(
                 top: false,
@@ -352,7 +388,9 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
                       Expanded(
                         child: InkWell(
                           onTap: () {
-                            if (_screen != 'verifying') setState(() => _screen = 'dashboard');
+                            if (_screen != 'verifying') {
+                              setState(() => _screen = 'dashboard');
+                            }
                           },
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -360,15 +398,21 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
                               Container(
                                 height: 2,
                                 width: 36,
-                                color: activeTab == 'dashboard' ? TEDxColors.tedRed : Colors.transparent,
+                                color: activeTab == 'dashboard'
+                                    ? TEDxColors.tedRed
+                                    : Colors.transparent,
                               ),
                               const Spacer(),
                               Text(
                                 'Counter',
                                 style: AppFonts.body(
-                                  color: activeTab == 'dashboard' ? Colors.white : const Color(0xFF71717A),
+                                  color: activeTab == 'dashboard'
+                                      ? Colors.white
+                                      : const Color(0xFF71717A),
                                   fontSize: 13,
-                                  fontWeight: activeTab == 'dashboard' ? FontWeight.w700 : FontWeight.w500,
+                                  fontWeight: activeTab == 'dashboard'
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -381,7 +425,9 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
                       Expanded(
                         child: InkWell(
                           onTap: () {
-                            if (_screen != 'verifying') setState(() => _screen = 'scanner');
+                            if (_screen != 'verifying') {
+                              setState(() => _screen = 'scanner');
+                            }
                           },
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -389,7 +435,9 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
                               Container(
                                 height: 2,
                                 width: 36,
-                                color: activeTab == 'scanner' ? TEDxColors.tedRed : Colors.transparent,
+                                color: activeTab == 'scanner'
+                                    ? TEDxColors.tedRed
+                                    : Colors.transparent,
                               ),
                               const Spacer(),
                               Row(
@@ -398,15 +446,21 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
                                   Icon(
                                     Icons.qr_code_scanner_rounded,
                                     size: 16,
-                                    color: activeTab == 'scanner' ? Colors.white : const Color(0xFF71717A),
+                                    color: activeTab == 'scanner'
+                                        ? Colors.white
+                                        : const Color(0xFF71717A),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
                                     'Scan',
                                     style: AppFonts.body(
-                                      color: activeTab == 'scanner' ? Colors.white : const Color(0xFF71717A),
+                                      color: activeTab == 'scanner'
+                                          ? Colors.white
+                                          : const Color(0xFF71717A),
                                       fontSize: 13,
-                                      fontWeight: activeTab == 'scanner' ? FontWeight.w700 : FontWeight.w500,
+                                      fontWeight: activeTab == 'scanner'
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
                                     ),
                                   ),
                                 ],
@@ -421,7 +475,12 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
                       Expanded(
                         child: InkWell(
                           onTap: () {
-                            if (_screen != 'verifying') setState(() => _screen = 'history');
+                            if (_screen != 'verifying') {
+                              ref
+                                  .read(redemptionHistoryProvider.notifier)
+                                  .refresh();
+                              setState(() => _screen = 'history');
+                            }
                           },
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -429,15 +488,21 @@ class _VolunteerWorkspaceState extends State<VolunteerWorkspace> {
                               Container(
                                 height: 2,
                                 width: 36,
-                                color: activeTab == 'history' ? TEDxColors.tedRed : Colors.transparent,
+                                color: activeTab == 'history'
+                                    ? TEDxColors.tedRed
+                                    : Colors.transparent,
                               ),
                               const Spacer(),
                               Text(
                                 'History',
                                 style: AppFonts.body(
-                                  color: activeTab == 'history' ? Colors.white : const Color(0xFF71717A),
+                                  color: activeTab == 'history'
+                                      ? Colors.white
+                                      : const Color(0xFF71717A),
                                   fontSize: 13,
-                                  fontWeight: activeTab == 'history' ? FontWeight.w700 : FontWeight.w500,
+                                  fontWeight: activeTab == 'history'
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
                                 ),
                               ),
                               const SizedBox(height: 4),

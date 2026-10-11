@@ -67,7 +67,7 @@ class _OutcomeResultScreenState extends State<OutcomeResultScreen> {
         MapEntry('Original scan', widget.lastSuccess?.time ?? '12:42 PM'),
         const MapEntry('Volunteer', 'Rahul Sharma'),
       ];
-    } else if (outcome == Outcome.not_eligible) {
+    } else if (outcome == Outcome.notEligible) {
       metadataRows = const [
         MapEntry('Ticket includes', 'Lunch only'),
         MapEntry('Required pass', 'Premium or VIP'),

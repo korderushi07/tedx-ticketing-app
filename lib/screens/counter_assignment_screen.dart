@@ -5,11 +5,15 @@ import '../models/app_models.dart';
 
 class CounterAssignmentScreen extends StatelessWidget {
   final CounterInfo counter;
+  final String volunteerName;
+  final String volunteerCode;
   final VoidCallback onStartScanning;
 
   const CounterAssignmentScreen({
     super.key,
     required this.counter,
+    required this.volunteerName,
+    required this.volunteerCode,
     required this.onStartScanning,
   });
 
@@ -37,7 +41,10 @@ class CounterAssignmentScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: TEDxColors.cardDark,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: TEDxColors.tedRed.withValues(alpha: 0.5), width: 1.5),
+                  border: Border.all(
+                    color: TEDxColors.tedRed.withValues(alpha: 0.5),
+                    width: 1.5,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,7 +53,10 @@ class CounterAssignmentScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: TEDxColors.tedRed,
                             borderRadius: BorderRadius.circular(6),
@@ -85,7 +95,7 @@ class CounterAssignmentScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${counter.benefit} redemption · Ground floor',
+                      '${counter.benefit} redemption',
                       style: AppFonts.body(
                         color: TEDxColors.textSecondary,
                         fontSize: 13,
@@ -110,7 +120,13 @@ class CounterAssignmentScreen extends StatelessWidget {
                       radius: 20,
                       backgroundColor: TEDxColors.tedRed,
                       child: Text(
-                        'RS',
+                        volunteerName
+                            .trim()
+                            .split(RegExp(r'\s+'))
+                            .where((part) => part.isNotEmpty)
+                            .take(2)
+                            .map((part) => part[0].toUpperCase())
+                            .join(),
                         style: AppFonts.heading(
                           color: Colors.white,
                           fontSize: 13,
@@ -123,7 +139,7 @@ class CounterAssignmentScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Rahul Sharma',
+                          volunteerName,
                           style: AppFonts.heading(
                             color: Colors.white,
                             fontSize: 15,
@@ -135,7 +151,7 @@ class CounterAssignmentScreen extends StatelessWidget {
                           text: TextSpan(
                             children: [
                               TextSpan(
-                                text: 'VOL–014',
+                                text: volunteerCode,
                                 style: AppFonts.mono(
                                   color: TEDxColors.textSecondary,
                                   fontSize: 12,

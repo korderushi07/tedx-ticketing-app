@@ -1,21 +1,8 @@
-enum Outcome {
-  approved,
-  redeemed,
-  not_eligible,
-  invalid,
-  network,
-}
+enum Outcome { approved, redeemed, notEligible, invalid, network }
 
-enum CounterKey {
-  food,
-  merch,
-}
+enum CounterKey { food, merch, goodie, workshop }
 
-enum FilterOption {
-  all,
-  approved,
-  rejected,
-}
+enum FilterOption { all, approved, rejected }
 
 class CounterInfo {
   final CounterKey key;
@@ -23,6 +10,8 @@ class CounterInfo {
   final String benefit;
   final String code;
   final int total;
+  final int? id;
+  final int? addonId;
 
   const CounterInfo({
     required this.key,
@@ -30,6 +19,8 @@ class CounterInfo {
     required this.benefit,
     required this.code,
     required this.total,
+    this.id,
+    this.addonId,
   });
 
   static const food = CounterInfo(
@@ -37,7 +28,7 @@ class CounterInfo {
     name: 'Food Counter 01',
     benefit: 'Lunch',
     code: 'FC–01',
-    total: 842,
+    total: 0,
   );
 
   static const merch = CounterInfo(
@@ -45,11 +36,63 @@ class CounterInfo {
     name: 'Merchandise Counter',
     benefit: 'T-Shirt',
     code: 'MC–01',
-    total: 1221,
+    total: 0,
   );
 
+  static const goodie = CounterInfo(
+    key: CounterKey.goodie,
+    name: 'Goodie Bag Counter',
+    benefit: 'Goodie Bag',
+    code: 'C04',
+    total: 0,
+  );
+
+  static const workshop = CounterInfo(
+    key: CounterKey.workshop,
+    name: 'VIP Workshop Desk',
+    benefit: 'Workshop',
+    code: 'C05',
+    total: 0,
+  );
+
+  factory CounterInfo.fromJson(Map<String, dynamic> json) {
+    final addonName = json['addon']?.toString().trim();
+    final normalizedAddon = addonName?.toLowerCase() ?? '';
+    final key = switch (normalizedAddon) {
+      'food' || 'lunch' || 'refreshment' => CounterKey.food,
+      't-shirt' || 'tshirt' || 'merchandise' || 'merch' => CounterKey.merch,
+      'goodie bag' || 'goodies' => CounterKey.goodie,
+      'workshop' => CounterKey.workshop,
+      _ => throw FormatException(
+        'Unsupported counter add-on: ${addonName ?? 'none'}',
+      ),
+    };
+    final id = json['id'];
+    final addonId = json['addon_id'];
+    if (id is! int || addonId is! int) {
+      throw const FormatException(
+        'Counter response is missing its ID or add-on ID.',
+      );
+    }
+
+    return CounterInfo(
+      key: key,
+      name: json['name']?.toString() ?? 'Assigned counter',
+      benefit: addonName ?? 'Addon',
+      code: json['code']?.toString() ?? 'Counter',
+      total: 0,
+      id: id,
+      addonId: addonId,
+    );
+  }
+
   static CounterInfo fromKey(CounterKey key) {
-    return key == CounterKey.food ? food : merch;
+    return switch (key) {
+      CounterKey.food => food,
+      CounterKey.merch => merch,
+      CounterKey.goodie => goodie,
+      CounterKey.workshop => workshop,
+    };
   }
 }
 
@@ -149,7 +192,7 @@ String getOutcomeLabel(Outcome outcome) {
       return outcomeApprovedLabel;
     case Outcome.redeemed:
       return outcomeRedeemedLabel;
-    case Outcome.not_eligible:
+    case Outcome.notEligible:
       return outcomeNotEligibleLabel;
     case Outcome.invalid:
       return outcomeInvalidLabel;

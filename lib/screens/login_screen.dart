@@ -12,7 +12,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: 'rahul@volunteer.tedxnagpur.in');
+  final _emailController = TextEditingController(
+    text: 'rahul@volunteer.tedxnagpur.in',
+  );
   final _pinController = TextEditingController();
   String _errorMsg = '';
   bool _isLoading = false;
@@ -22,7 +24,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _pinController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      setState(() => _errorMsg = 'Enter your volunteer ID and PIN to continue.');
+      setState(
+        () => _errorMsg = 'Enter your volunteer ID and PIN to continue.',
+      );
       return;
     }
 
@@ -36,9 +40,21 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         if (res.containsKey('access_token')) {
-          widget.onContinue();
+          if (ApiService().assignedCounter == null) {
+            await ApiService().setAuthToken(null);
+            if (mounted) {
+              setState(() {
+                _errorMsg =
+                    'No counter is assigned to this volunteer account. Contact event operations.';
+              });
+            }
+          } else {
+            widget.onContinue();
+          }
         } else {
-          setState(() => _errorMsg = res['message']?.toString() ?? 'Login failed');
+          setState(
+            () => _errorMsg = res['message']?.toString() ?? 'Login failed',
+          );
         }
       }
     } catch (e) {
@@ -130,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // Email label & input
               Text(
-                'Email or volunteer ID',
+                'Volunteer email',
                 style: AppFonts.body(
                   color: const Color(0xFFA1A1AA),
                   fontSize: 13,
@@ -146,7 +162,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   fontWeight: FontWeight.w600,
                 ),
                 decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                   filled: true,
                   fillColor: const Color(0xFF101012),
                   enabledBorder: OutlineInputBorder(
@@ -155,7 +174,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(4),
-                    borderSide: const BorderSide(color: TEDxColors.tedRed, width: 1.5),
+                    borderSide: const BorderSide(
+                      color: TEDxColors.tedRed,
+                      width: 1.5,
+                    ),
                   ),
                   hintText: 'rahul@volunteer.tedxnagpur.in',
                   hintStyle: AppFonts.body(color: const Color(0xFF52525B)),
@@ -183,7 +205,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   fontWeight: FontWeight.w600,
                 ),
                 decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                   filled: true,
                   fillColor: const Color(0xFF101012),
                   enabledBorder: OutlineInputBorder(
@@ -192,7 +217,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(4),
-                    borderSide: const BorderSide(color: TEDxColors.tedRed, width: 1.5),
+                    borderSide: const BorderSide(
+                      color: TEDxColors.tedRed,
+                      width: 1.5,
+                    ),
                   ),
                   hintText: 'Enter your PIN',
                   hintStyle: AppFonts.body(color: const Color(0xFF52525B)),
@@ -222,7 +250,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     backgroundColor: TEDxColors.tedRed,
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(4),
                     ),

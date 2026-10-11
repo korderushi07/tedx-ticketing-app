@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import '../models/app_models.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -11,12 +12,16 @@ class ApiService {
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   String? _authToken;
-  int? assignedCounterId;
+  CounterInfo? assignedCounter;
+  String? assignedVolunteerName;
+  String? assignedVolunteerCode;
 
   Future<void> initToken() async {
     try {
       _authToken = await _storage.read(key: 'jwt_token');
-      debugPrint('[ApiService] Restored token from secure storage: ${_authToken != null ? "Token present" : "None"}');
+      debugPrint(
+        '[ApiService] Restored token from secure storage: ${_authToken != null ? "Token present" : "None"}',
+      );
     } catch (e) {
       debugPrint('[ApiService] Failed to read secure storage: $e');
     }
@@ -24,6 +29,11 @@ class ApiService {
 
   Future<void> setAuthToken(String? token) async {
     _authToken = token;
+    if (token == null) {
+      assignedCounter = null;
+      assignedVolunteerName = null;
+      assignedVolunteerCode = null;
+    }
     try {
       if (token != null) {
         await _storage.write(key: 'jwt_token', value: token);
@@ -53,8 +63,12 @@ class ApiService {
     final url = Uri.parse('${ApiConfig.baseUrl}/');
     debugPrint('[API REQUEST] GET $url');
     try {
-      final response = await http.get(url, headers: _getHeaders()).timeout(const Duration(seconds: 5));
-      debugPrint('[API RESPONSE] Status ${response.statusCode}: ${response.body}');
+      final response = await http
+          .get(url, headers: _getHeaders())
+          .timeout(const Duration(seconds: 5));
+      debugPrint(
+        '[API RESPONSE] Status ${response.statusCode}: ${response.body}',
+      );
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('[API ERROR] GET $url failed: $e');
@@ -65,30 +79,36 @@ class ApiService {
   /// Volunteer Login
   Future<Map<String, dynamic>> login(String email, String password) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/auth/login');
-    debugPrint('[API REQUEST] POST $url | Body: {"email": "$email"}');
-    
-    try {
-      final response = await http.post(
-        url,
-        headers: _getHeaders(),
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
-      ).timeout(const Duration(seconds: 8));
+    debugPrint('[API REQUEST] POST $url');
 
-      debugPrint('[API RESPONSE] Status ${response.statusCode}: ${response.body}');
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: _getHeaders(),
+            body: jsonEncode({'email': email, 'password': password}),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      debugPrint('[API RESPONSE] Login status ${response.statusCode}');
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      
+
       if (response.statusCode == 200 && data.containsKey('access_token')) {
-        await setAuthToken(data['access_token'] as String);
         if (data.containsKey('volunteer') && data['volunteer'] is Map) {
           final vol = data['volunteer'] as Map<String, dynamic>;
-          assignedCounterId = vol['counter_id'] as int?;
-          debugPrint('[ApiService] Assigned Counter ID: $assignedCounterId');
+          final counter = vol['counter'];
+          assignedCounter = counter is Map
+              ? CounterInfo.fromJson(Map<String, dynamic>.from(counter))
+              : null;
+          assignedVolunteerName = vol['name']?.toString();
+          assignedVolunteerCode = vol['volunteer_code']?.toString();
+          debugPrint(
+            '[ApiService] Assigned counter: ${assignedCounter?.code ?? 'none'}',
+          );
         }
+        await setAuthToken(data['access_token'] as String);
       }
-      
+
       return data;
     } catch (e) {
       debugPrint('[API ERROR] POST $url failed: $e');
@@ -99,25 +119,29 @@ class ApiService {
   /// Verify Attendee QR Code
   Future<Map<String, dynamic>> verifyQR(String qrToken) async {
     final encodedToken = Uri.encodeComponent(qrToken);
-    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/attendees/qr/$encodedToken');
+    final url = Uri.parse(
+      '${ApiConfig.baseUrl}/api/v1/attendees/qr/$encodedToken',
+    );
     debugPrint('[API REQUEST] GET $url');
 
     try {
-      final response = await http.get(
-        url,
-        headers: _getHeaders(),
-      ).timeout(const Duration(seconds: 8));
+      final response = await http
+          .get(url, headers: _getHeaders())
+          .timeout(const Duration(seconds: 8));
 
-      debugPrint('[API RESPONSE] Status ${response.statusCode}: ${response.body}');
+      debugPrint(
+        '[API RESPONSE] Status ${response.statusCode}: ${response.body}',
+      );
       final body = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 404) {
         return {
           'error': 'INVALID_QR',
-          'message': body['message'] ?? 'This QR code is not registered with TEDx.',
+          'message':
+              body['message'] ?? 'This QR code is not registered with TEDx.',
         };
       }
-      
+
       return body;
     } catch (e) {
       debugPrint('[API ERROR] GET $url failed: $e');
@@ -140,13 +164,13 @@ class ApiService {
     debugPrint('[API REQUEST] POST $url | Body: ${jsonEncode(payload)}');
 
     try {
-      final response = await http.post(
-        url,
-        headers: _getHeaders(),
-        body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 8));
+      final response = await http
+          .post(url, headers: _getHeaders(), body: jsonEncode(payload))
+          .timeout(const Duration(seconds: 8));
 
-      debugPrint('[API RESPONSE] Status ${response.statusCode}: ${response.body}');
+      debugPrint(
+        '[API RESPONSE] Status ${response.statusCode}: ${response.body}',
+      );
       return jsonDecode(response.body) as Map<String, dynamic>;
     } catch (e) {
       debugPrint('[API ERROR] POST $url failed: $e');
@@ -160,12 +184,13 @@ class ApiService {
     debugPrint('[API REQUEST] GET $url');
 
     try {
-      final response = await http.get(
-        url,
-        headers: _getHeaders(),
-      ).timeout(const Duration(seconds: 8));
+      final response = await http
+          .get(url, headers: _getHeaders())
+          .timeout(const Duration(seconds: 8));
 
-      debugPrint('[API RESPONSE] Status ${response.statusCode}: ${response.body}');
+      debugPrint(
+        '[API RESPONSE] Status ${response.statusCode}: ${response.body}',
+      );
       return jsonDecode(response.body) as List<dynamic>;
     } catch (e) {
       debugPrint('[API ERROR] GET $url failed: $e');
@@ -175,16 +200,19 @@ class ApiService {
 
   /// Get Counter Statistics from Database
   Future<Map<String, dynamic>> getCounterStats(int counterId) async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/counters/$counterId/stats');
+    final url = Uri.parse(
+      '${ApiConfig.baseUrl}/api/v1/counters/$counterId/stats',
+    );
     debugPrint('[API REQUEST] GET $url');
 
     try {
-      final response = await http.get(
-        url,
-        headers: _getHeaders(),
-      ).timeout(const Duration(seconds: 8));
+      final response = await http
+          .get(url, headers: _getHeaders())
+          .timeout(const Duration(seconds: 8));
 
-      debugPrint('[API RESPONSE] Status ${response.statusCode}: ${response.body}');
+      debugPrint(
+        '[API RESPONSE] Status ${response.statusCode}: ${response.body}',
+      );
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
