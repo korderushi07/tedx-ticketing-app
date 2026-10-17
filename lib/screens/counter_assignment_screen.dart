@@ -256,7 +256,7 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${counter.benefit} redemption',
+                                counter.description,
                                 style: AppFonts.body(
                                   color: TEDxColors.textSecondary,
                                   fontSize: 12,

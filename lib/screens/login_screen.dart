@@ -25,7 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (email.isEmpty || password.isEmpty) {
       setState(
-        () => _errorMsg = 'Enter your volunteer ID and PIN to continue.',
+        () => _errorMsg = 'Enter your email and password or PIN to continue.',
       );
       return;
     }
@@ -175,9 +175,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
 
-              // PIN label & input
+              // Password / PIN label & input
               Text(
-                'PIN',
+                'Password / PIN',
                 style: AppFonts.body(
                   color: const Color(0xFFA1A1AA),
                   fontSize: 13,
@@ -188,7 +188,9 @@ class _LoginScreenState extends State<LoginScreen> {
               TextField(
                 controller: _pinController,
                 obscureText: true,
-                keyboardType: TextInputType.number,
+                keyboardType: TextInputType.visiblePassword,
+                autocorrect: false,
+                enableSuggestions: false,
                 style: AppFonts.body(
                   color: Colors.white,
                   fontSize: 15,
@@ -212,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: 1.5,
                     ),
                   ),
-                  hintText: 'Enter your PIN',
+                  hintText: 'Enter your password or PIN',
                   hintStyle: AppFonts.body(color: const Color(0xFF52525B)),
                 ),
               ),

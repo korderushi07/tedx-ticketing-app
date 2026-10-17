@@ -13,6 +13,15 @@ class CounterInfo {
   final int? id;
   final int? addonId;
 
+  String get description => switch (code) {
+    'C01' => 'Registration / Ticket Verification',
+    'C02' => 'Food redemption',
+    'C03' => 'T-Shirt redemption',
+    'C04' => 'Goodie Bag redemption',
+    'C05' => 'VIP Workshop Check-in',
+    _ => '$benefit redemption',
+  };
+
   const CounterInfo({
     required this.key,
     required this.name,
@@ -27,15 +36,15 @@ class CounterInfo {
     key: CounterKey.food,
     name: 'Food Counter 01',
     benefit: 'Lunch',
-    code: 'FC–01',
+    code: 'C02',
     total: 0,
   );
 
   static const merch = CounterInfo(
     key: CounterKey.merch,
-    name: 'Merchandise Counter',
+    name: 'T-Shirt Counter',
     benefit: 'T-Shirt',
-    code: 'MC–01',
+    code: 'C03',
     total: 0,
   );
 

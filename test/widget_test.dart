@@ -6,6 +6,7 @@ import 'package:ticketingapp/main.dart';
 import 'package:ticketingapp/models/app_models.dart';
 import 'package:ticketingapp/screens/counter_assignment_screen.dart';
 import 'package:ticketingapp/screens/dashboard_screen.dart';
+import 'package:ticketingapp/screens/login_screen.dart';
 
 void main() {
   setUp(() {
@@ -13,89 +14,104 @@ void main() {
   });
 
   testWidgets('TEDx Nagpur 2026 app smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const ProviderScope(
-        child: TEDxEventOpsApp(),
-      ),
-    );
+    await tester.pumpWidget(const ProviderScope(child: TEDxEventOpsApp()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('Volunteer sign in'), findsOneWidget);
   });
 
-  testWidgets('CounterAssignmentScreen allows counter switching and confirmation',
-      (WidgetTester tester) async {
-    CounterInfo? selected;
-    bool started = false;
+  testWidgets('Login credential field accepts an alphanumeric password', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(MaterialApp(home: LoginScreen(onContinue: () {})));
 
-    tester.view.physicalSize = const Size(800, 1600);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(() => tester.view.resetPhysicalSize());
+    expect(find.text('Password / PIN'), findsOneWidget);
+    final passwordField = tester
+        .widgetList<TextField>(find.byType(TextField))
+        .last;
+    expect(passwordField.keyboardType, TextInputType.visiblePassword);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: CounterAssignmentScreen(
-          counter: CounterInfo.food,
-          volunteerName: 'Rahul Sharma',
-          volunteerCode: 'VOL-001',
-          onCounterSelected: (c) => selected = c,
-          onStartScanning: () => started = true,
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Select active counter.'), findsOneWidget);
-    expect(find.text('Rahul Sharma'), findsOneWidget);
-    expect(find.text('CONFIRM COUNTER & START SCANNING'), findsOneWidget);
-
-    // Tap Confirm button
-    final confirmBtn = find.text('CONFIRM COUNTER & START SCANNING');
-    await tester.ensureVisible(confirmBtn);
-    await tester.tap(confirmBtn);
-    await tester.pumpAndSettle();
-
-    expect(started, isTrue);
-    expect(selected, isNotNull);
+    await tester.enterText(find.byType(TextField).last, 'admin123');
+    expect(passwordField.controller?.text, 'admin123');
   });
 
-  testWidgets('DashboardScreen displays active counter and visible Logout button',
-      (WidgetTester tester) async {
-    bool loggedOut = false;
-    bool switched = false;
+  testWidgets(
+    'CounterAssignmentScreen allows counter switching and confirmation',
+    (WidgetTester tester) async {
+      CounterInfo? selected;
+      bool started = false;
 
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          home: DashboardScreen(
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CounterAssignmentScreen(
             counter: CounterInfo.food,
             volunteerName: 'Rahul Sharma',
-            addedCount: 0,
-            recentScans: const [],
-            onScanClick: () {},
-            onViewHistoryClick: () {},
-            onSelectScan: (_) {},
-            onLogout: () => loggedOut = true,
-            onSwitchCounter: () => switched = true,
+            volunteerCode: 'VOL-001',
+            onCounterSelected: (c) => selected = c,
+            onStartScanning: () => started = true,
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('COUNTER FC–01'), findsOneWidget);
-    expect(find.text('Food Counter 01'), findsOneWidget);
-    expect(find.text('LOGOUT'), findsOneWidget);
-    expect(find.text('SWITCH'), findsOneWidget);
+      expect(find.text('Select active counter.'), findsOneWidget);
+      expect(find.text('Rahul Sharma'), findsOneWidget);
+      expect(find.text('CONFIRM COUNTER & START SCANNING'), findsOneWidget);
 
-    // Tap Logout button
-    await tester.tap(find.text('LOGOUT'));
-    await tester.pumpAndSettle();
-    expect(loggedOut, isTrue);
+      // Tap Confirm button
+      final confirmBtn = find.text('CONFIRM COUNTER & START SCANNING');
+      await tester.ensureVisible(confirmBtn);
+      await tester.tap(confirmBtn);
+      await tester.pumpAndSettle();
 
-    // Tap Switch button
-    await tester.tap(find.text('SWITCH'));
-    await tester.pumpAndSettle();
-    expect(switched, isTrue);
-  });
+      expect(started, isTrue);
+      expect(selected, isNotNull);
+    },
+  );
+
+  testWidgets(
+    'DashboardScreen displays active counter and visible Logout button',
+    (WidgetTester tester) async {
+      bool loggedOut = false;
+      bool switched = false;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: DashboardScreen(
+              counter: CounterInfo.food,
+              volunteerName: 'Rahul Sharma',
+              addedCount: 0,
+              recentScans: const [],
+              onScanClick: () {},
+              onViewHistoryClick: () {},
+              onSelectScan: (_) {},
+              onLogout: () => loggedOut = true,
+              onSwitchCounter: () => switched = true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('COUNTER C02'), findsOneWidget);
+      expect(find.text('Food Counter 01'), findsOneWidget);
+      expect(find.text('LOGOUT'), findsOneWidget);
+      expect(find.text('SWITCH'), findsOneWidget);
+
+      // Tap Logout button
+      await tester.tap(find.text('LOGOUT'));
+      await tester.pumpAndSettle();
+      expect(loggedOut, isTrue);
+
+      // Tap Switch button
+      await tester.tap(find.text('SWITCH'));
+      await tester.pumpAndSettle();
+      expect(switched, isTrue);
+    },
+  );
 }
