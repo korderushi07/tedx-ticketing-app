@@ -76,6 +76,138 @@ class ApiService {
     }
   }
 
+  Future<void> setSelectedCounter(CounterInfo? counter) async {
+    assignedCounter = counter;
+    try {
+      if (counter?.id != null) {
+        await _storage.write(
+          key: 'selected_counter_id',
+          value: counter!.id.toString(),
+        );
+      } else {
+        await _storage.delete(key: 'selected_counter_id');
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Error saving selected counter: $e');
+    }
+  }
+
+  /// Restore user session on startup
+  Future<bool> restoreSession() async {
+    try {
+      await initToken();
+      if (_authToken == null || _authToken!.isEmpty) {
+        return false;
+      }
+
+      final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/auth/me');
+      debugPrint('[ApiService] Checking saved session: GET $url');
+      final response = await http
+          .get(url, headers: _getHeaders())
+          .timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        assignedVolunteerName = data['name']?.toString() ?? 'Volunteer';
+        assignedVolunteerCode = data['volunteer_code']?.toString() ?? '';
+
+        // Fetch available counters
+        final counters = await getCounters();
+
+        // Restore previously selected counter if saved
+        final savedCounterIdStr = await _storage.read(
+          key: 'selected_counter_id',
+        );
+        if (savedCounterIdStr != null && counters.isNotEmpty) {
+          final savedId = int.tryParse(savedCounterIdStr);
+          final matched = counters.where((c) => c.id == savedId);
+          if (matched.isNotEmpty) {
+            assignedCounter = matched.first;
+          }
+        }
+
+        // If no saved counter or counter not matched, check if assigned in profile or default to first
+        if (assignedCounter == null && counters.isNotEmpty) {
+          final profileCounter = data['counter'];
+          if (profileCounter is Map) {
+            final pId = profileCounter['id'] as int?;
+            final matched = counters.where((c) => c.id == pId);
+            if (matched.isNotEmpty) {
+              assignedCounter = matched.first;
+            }
+          }
+          assignedCounter ??= counters.first;
+        }
+
+        debugPrint(
+          '[ApiService] Session restored successfully for $assignedVolunteerName. Active counter: ${assignedCounter?.name}',
+        );
+        return true;
+      } else {
+        debugPrint(
+          '[ApiService] Session expired or invalid (HTTP ${response.statusCode}). Clearing credentials.',
+        );
+        await setAuthToken(null);
+        return false;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] restoreSession exception: $e');
+      return false;
+    }
+  }
+
+  /// Explicit Logout
+  Future<void> logout() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/auth/logout');
+    debugPrint('[ApiService] Logging out: POST $url');
+    try {
+      if (_authToken != null) {
+        await http
+            .post(url, headers: _getHeaders())
+            .timeout(const Duration(seconds: 4));
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Remote logout call error (ignoring): $e');
+    } finally {
+      await setAuthToken(null);
+      await setSelectedCounter(null);
+      assignedVolunteerName = null;
+      assignedVolunteerCode = null;
+      debugPrint('[ApiService] Authenticated state cleared on logout.');
+    }
+  }
+
+  /// Fetch All Available Counters
+  Future<List<CounterInfo>> getCounters() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/counters');
+    debugPrint('[API REQUEST] GET $url');
+
+    try {
+      final response = await http
+          .get(url, headers: _getHeaders())
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final list = jsonDecode(response.body) as List<dynamic>;
+        final results = <CounterInfo>[];
+        for (final item in list) {
+          try {
+            results.add(
+              CounterInfo.fromJson(Map<String, dynamic>.from(item as Map)),
+            );
+          } catch (e) {
+            debugPrint('[ApiService] Skipping counter parse error: $e');
+          }
+        }
+        return results;
+      }
+      return [];
+    } catch (e) {
+      debugPrint('[API ERROR] GET $url failed: $e');
+      return [];
+    }
+  }
+
   /// Volunteer Login
   Future<Map<String, dynamic>> login(String email, String password) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/auth/login');
@@ -94,19 +226,30 @@ class ApiService {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200 && data.containsKey('access_token')) {
+        await setAuthToken(data['access_token'] as String);
+
         if (data.containsKey('volunteer') && data['volunteer'] is Map) {
           final vol = data['volunteer'] as Map<String, dynamic>;
-          final counter = vol['counter'];
-          assignedCounter = counter is Map
-              ? CounterInfo.fromJson(Map<String, dynamic>.from(counter))
-              : null;
           assignedVolunteerName = vol['name']?.toString();
           assignedVolunteerCode = vol['volunteer_code']?.toString();
-          debugPrint(
-            '[ApiService] Assigned counter: ${assignedCounter?.code ?? 'none'}',
-          );
+
+          final counter = vol['counter'];
+          if (counter is Map) {
+            try {
+              assignedCounter = CounterInfo.fromJson(
+                Map<String, dynamic>.from(counter),
+              );
+              await setSelectedCounter(assignedCounter);
+            } catch (_) {}
+          }
         }
-        await setAuthToken(data['access_token'] as String);
+
+        // Fetch counters and pick first if none set
+        final counters = await getCounters();
+        if (assignedCounter == null && counters.isNotEmpty) {
+          assignedCounter = counters.first;
+          await setSelectedCounter(assignedCounter);
+        }
       }
 
       return data;
@@ -117,10 +260,14 @@ class ApiService {
   }
 
   /// Verify Attendee QR Code
-  Future<Map<String, dynamic>> verifyQR(String qrToken) async {
+  Future<Map<String, dynamic>> verifyQR(
+    String qrToken, {
+    int? counterId,
+  }) async {
     final encodedToken = Uri.encodeComponent(qrToken);
+    final query = counterId != null ? '?counter_id=$counterId' : '';
     final url = Uri.parse(
-      '${ApiConfig.baseUrl}/api/v1/attendees/qr/$encodedToken',
+      '${ApiConfig.baseUrl}/api/v1/attendees/qr/$encodedToken$query',
     );
     debugPrint('[API REQUEST] GET $url');
 

@@ -47,7 +47,7 @@ class VolunteerWorkspace extends ConsumerStatefulWidget {
 
 class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
   String _screen =
-      'login'; // login, counter, dashboard, scanner, verifying, history, detail, outcome
+      'loading'; // loading, login, counter, dashboard, scanner, verifying, history, detail, outcome
   CounterInfo _assignedCounter = CounterInfo.food;
   String _volunteerName = '';
   String _volunteerCode = '';
@@ -62,6 +62,54 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
 
   ScanModel? _selectedDetailScan;
   Timer? _verifyingTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreSavedSession();
+  }
+
+  Future<void> _restoreSavedSession() async {
+    try {
+      final restored = await ApiService().restoreSession();
+      if (!mounted) return;
+      if (restored) {
+        final api = ApiService();
+        setState(() {
+          if (api.assignedCounter != null) {
+            _assignedCounter = api.assignedCounter!;
+          }
+          _volunteerName = api.assignedVolunteerName ?? 'Volunteer';
+          _volunteerCode = api.assignedVolunteerCode ?? '';
+          _screen = 'dashboard';
+        });
+        ref.read(redemptionHistoryProvider.notifier).refresh();
+        return;
+      }
+    } catch (e) {
+      debugPrint('[INIT SESSION ERROR] $e');
+    }
+    if (mounted) {
+      setState(() => _screen = 'login');
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    await ApiService().logout();
+    if (!mounted) return;
+    ref.read(redemptionHistoryProvider.notifier).clear();
+    ref.read(currentScanProvider.notifier).clearScan();
+    setState(() {
+      _screen = 'login';
+      _volunteerName = '';
+      _volunteerCode = '';
+      _addedCount.updateAll((key, val) => 0);
+    });
+  }
+
+  void _handleSwitchCounter() {
+    setState(() => _screen = 'counter');
+  }
 
   @override
   void dispose() {
@@ -98,7 +146,10 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
     }
 
     try {
-      final res = await ApiService().verifyQR(tokenClean);
+      final res = await ApiService().verifyQR(
+        tokenClean,
+        counterId: counterId,
+      );
       if (res.containsKey('attendee') && res['attendee'] != null) {
         final att = res['attendee'] as Map<String, dynamic>;
         attendeeId = att['id'] as int?;
@@ -240,7 +291,9 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
 
   @override
   Widget build(BuildContext context) {
-    final showNav = _screen != 'login' && _screen != 'counter';
+    final showNav = _screen != 'login' &&
+        _screen != 'counter' &&
+        _screen != 'loading';
     final historyAsync = ref.watch(redemptionHistoryProvider);
     final currentScan = ref.watch(currentScanProvider);
 
@@ -269,14 +322,18 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
 
     Widget bodyWidget;
 
-    if (_screen == 'login') {
+    if (_screen == 'loading') {
+      bodyWidget = const Center(
+        child: CircularProgressIndicator(color: TEDxColors.tedRed),
+      );
+    } else if (_screen == 'login') {
       bodyWidget = LoginScreen(
         onContinue: () {
           final api = ApiService();
-          final assignedCounter = api.assignedCounter;
-          if (assignedCounter == null) return;
           setState(() {
-            _assignedCounter = assignedCounter;
+            if (api.assignedCounter != null) {
+              _assignedCounter = api.assignedCounter!;
+            }
             _volunteerName = api.assignedVolunteerName ?? 'Volunteer';
             _volunteerCode = api.assignedVolunteerCode ?? '';
             _screen = 'counter';
@@ -289,7 +346,13 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
         counter: _activeCounter,
         volunteerName: _volunteerName,
         volunteerCode: _volunteerCode,
+        onCounterSelected: (newCounter) {
+          setState(() {
+            _assignedCounter = newCounter;
+          });
+        },
         onStartScanning: () => setState(() => _screen = 'dashboard'),
+        onBackPressed: () => setState(() => _screen = 'dashboard'),
       );
     } else if (_screen == 'dashboard') {
       bodyWidget = DashboardScreen(
@@ -299,6 +362,8 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
         recentScans: scopedHistory,
         onScanClick: () => setState(() => _screen = 'scanner'),
         onViewHistoryClick: () => setState(() => _screen = 'history'),
+        onLogout: _handleLogout,
+        onSwitchCounter: _handleSwitchCounter,
         onSelectScan: (scan) {
           setState(() {
             _selectedDetailScan = scan;
@@ -343,6 +408,8 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
         recentScans: scopedHistory,
         onScanClick: () => setState(() => _screen = 'scanner'),
         onViewHistoryClick: () => setState(() => _screen = 'history'),
+        onLogout: _handleLogout,
+        onSwitchCounter: _handleSwitchCounter,
         onSelectScan: (scan) {
           setState(() {
             _selectedDetailScan = scan;

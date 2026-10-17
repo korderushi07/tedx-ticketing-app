@@ -14,6 +14,8 @@ class DashboardScreen extends ConsumerStatefulWidget {
   final VoidCallback onScanClick;
   final VoidCallback onViewHistoryClick;
   final ValueChanged<ScanModel> onSelectScan;
+  final VoidCallback? onLogout;
+  final VoidCallback? onSwitchCounter;
 
   const DashboardScreen({
     super.key,
@@ -24,6 +26,8 @@ class DashboardScreen extends ConsumerStatefulWidget {
     required this.onScanClick,
     required this.onViewHistoryClick,
     required this.onSelectScan,
+    this.onLogout,
+    this.onSwitchCounter,
   });
 
   @override
@@ -106,39 +110,87 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header section
-                Text(
-                  'COUNTER ${widget.counter.code}',
-                  style: AppFonts.mono(
-                    color: const Color(0xFF71717A),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  widget.counter.name,
-                  style: AppFonts.heading(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.8,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${widget.volunteerName} · Volunteer',
-                  style: AppFonts.body(
-                    color: const Color(0xFFA1A1AA),
-                    fontSize: 14,
-                  ),
+                // Header section with Top-Right Logout
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'COUNTER ${widget.counter.code}',
+                            style: AppFonts.mono(
+                              color: const Color(0xFF71717A),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            widget.counter.name,
+                            style: AppFonts.heading(
+                              color: Colors.white,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${widget.volunteerName} · Volunteer',
+                            style: AppFonts.body(
+                              color: const Color(0xFFA1A1AA),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (widget.onLogout != null)
+                      GestureDetector(
+                        onTap: widget.onLogout,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF27272A),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF3F3F46)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.logout_rounded,
+                                size: 14,
+                                color: TEDxColors.tedRed,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'LOGOUT',
+                                style: AppFonts.mono(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 20),
                 const Divider(color: Color(0xFF1F1F23), height: 1),
                 const SizedBox(height: 16),
 
-                // Operational status bar
+                // Operational status bar with Counter Switch button
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -160,14 +212,56 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ),
                       ],
                     ),
-                    Text(
-                      widget.counter.benefit.toUpperCase(),
-                      style: AppFonts.mono(
-                        color: const Color(0xFF71717A),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          widget.counter.benefit.toUpperCase(),
+                          style: AppFonts.mono(
+                            color: const Color(0xFF71717A),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        if (widget.onSwitchCounter != null) ...[
+                          const SizedBox(width: 10),
+                          GestureDetector(
+                            onTap: widget.onSwitchCounter,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF27272A),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: const Color(0xFF3F3F46),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.swap_horiz_rounded,
+                                    size: 13,
+                                    color: Colors.white70,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'SWITCH',
+                                    style: AppFonts.mono(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

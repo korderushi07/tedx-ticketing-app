@@ -40,17 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         if (res.containsKey('access_token')) {
-          if (ApiService().assignedCounter == null) {
-            await ApiService().setAuthToken(null);
-            if (mounted) {
-              setState(() {
-                _errorMsg =
-                    'No counter is assigned to this volunteer account. Contact event operations.';
-              });
-            }
-          } else {
-            widget.onContinue();
-          }
+          widget.onContinue();
         } else {
           setState(
             () => _errorMsg = res['message']?.toString() ?? 'Login failed',

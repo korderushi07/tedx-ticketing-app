@@ -155,7 +155,7 @@ class ScanModel {
 class AttendeeModel {
   final String ticketId;
   final String name;
-  final String ticketType; // VIP, Premium, General
+  final String ticketType; // VIP, Premium, Standard
   final List<String> benefits;
 
   const AttendeeModel({

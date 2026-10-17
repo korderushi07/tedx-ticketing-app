@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tedx_components.dart';
 import '../models/app_models.dart';
+import '../services/api_service.dart';
 
-class CounterAssignmentScreen extends StatelessWidget {
+class CounterAssignmentScreen extends StatefulWidget {
   final CounterInfo counter;
   final String volunteerName;
   final String volunteerCode;
+  final ValueChanged<CounterInfo>? onCounterSelected;
   final VoidCallback onStartScanning;
+  final VoidCallback? onBackPressed;
 
   const CounterAssignmentScreen({
     super.key,
@@ -15,7 +18,74 @@ class CounterAssignmentScreen extends StatelessWidget {
     required this.volunteerName,
     required this.volunteerCode,
     required this.onStartScanning,
+    this.onCounterSelected,
+    this.onBackPressed,
   });
+
+  @override
+  State<CounterAssignmentScreen> createState() =>
+      _CounterAssignmentScreenState();
+}
+
+class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
+  late CounterInfo _selectedCounter;
+  List<CounterInfo> _availableCounters = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCounter = widget.counter;
+    _loadCounters();
+  }
+
+  Future<void> _loadCounters() async {
+    setState(() => _isLoading = true);
+    try {
+      final counters = await ApiService().getCounters();
+      if (mounted) {
+        setState(() {
+          if (counters.isNotEmpty) {
+            _availableCounters = counters;
+            // Match selected counter if present in loaded counters
+            final matched = counters.where(
+              (c) => c.id == _selectedCounter.id || c.code == _selectedCounter.code,
+            );
+            if (matched.isNotEmpty) {
+              _selectedCounter = matched.first;
+            }
+          } else {
+            _availableCounters = [
+              CounterInfo.food,
+              CounterInfo.merch,
+              CounterInfo.goodie,
+              CounterInfo.workshop,
+            ];
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[CounterAssignmentScreen] Error loading counters: $e');
+      if (mounted) {
+        setState(() {
+          _availableCounters = [
+            CounterInfo.food,
+            CounterInfo.merch,
+            CounterInfo.goodie,
+            CounterInfo.workshop,
+          ];
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _handleConfirm() {
+    ApiService().setSelectedCounter(_selectedCounter);
+    widget.onCounterSelected?.call(_selectedCounter);
+    widget.onStartScanning();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,86 +97,183 @@ class CounterAssignmentScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SectionHeading(
-                label: 'VOLUNTEER ACCESS',
-                title: 'Your counter. Your shift.',
-                support: 'Everything you need to keep the line moving.',
-              ),
-              const SizedBox(height: 24),
-
-              // Assigned Counter Box
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: TEDxColors.cardDark,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: TEDxColors.tedRed.withValues(alpha: 0.5),
-                    width: 1.5,
+              if (widget.onBackPressed != null) ...[
+                GestureDetector(
+                  onTap: widget.onBackPressed,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.arrow_back_ios_rounded,
+                        color: Color(0xFFA1A1AA),
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'BACK TO DASHBOARD',
+                        style: AppFonts.mono(
+                          color: const Color(0xFFA1A1AA),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                const SizedBox(height: 16),
+              ],
+              const SectionHeading(
+                label: 'COUNTER SELECTION',
+                title: 'Select active counter.',
+                support:
+                    'Choose the counter you are operating for this shift. Switch anytime.',
+              ),
+              const SizedBox(height: 20),
+
+              // Available Counters Selector Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'AVAILABLE COUNTERS',
+                    style: AppFonts.mono(
+                      color: TEDxColors.textMuted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  if (_isLoading)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: TEDxColors.tedRed,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Counters List
+              ..._availableCounters.map((counter) {
+                final isSelected =
+                    (counter.id != null && counter.id == _selectedCounter.id) ||
+                    counter.code == _selectedCounter.code;
+
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedCounter = counter;
+                    });
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF1E1718)
+                          : TEDxColors.cardDark,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isSelected
+                            ? TEDxColors.tedRed
+                            : TEDxColors.cardBorder,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
+                        // Radio circle
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
+                          width: 20,
+                          height: 20,
                           decoration: BoxDecoration(
-                            color: TEDxColors.tedRed,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            counter.code,
-                            style: AppFonts.mono(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.0,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected
+                                  ? TEDxColors.tedRed
+                                  : const Color(0xFF52525B),
+                              width: 2,
                             ),
+                            color: isSelected
+                                ? TEDxColors.tedRed
+                                : Colors.transparent,
+                          ),
+                          child: isSelected
+                              ? const Center(
+                                  child: Icon(
+                                    Icons.check,
+                                    size: 13,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 14),
+
+                        // Counter Info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? TEDxColors.tedRed
+                                          : const Color(0xFF27272A),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      counter.code,
+                                      style: AppFonts.mono(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    counter.name,
+                                    style: AppFonts.heading(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${counter.benefit} redemption',
+                                style: AppFonts.body(
+                                  color: TEDxColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'YOUR ASSIGNED COUNTER',
-                      style: AppFonts.mono(
-                        color: TEDxColors.textMuted,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      counter.name,
-                      style: AppFonts.heading(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${counter.benefit} redemption',
-                      style: AppFonts.body(
-                        color: TEDxColors.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
+                  ),
+                );
+              }),
 
-              // Volunteer Profile Item Box
+              const SizedBox(height: 16),
+
+              // Volunteer Profile Box
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -120,7 +287,7 @@ class CounterAssignmentScreen extends StatelessWidget {
                       radius: 20,
                       backgroundColor: TEDxColors.tedRed,
                       child: Text(
-                        volunteerName
+                        widget.volunteerName
                             .trim()
                             .split(RegExp(r'\s+'))
                             .where((part) => part.isNotEmpty)
@@ -139,7 +306,7 @@ class CounterAssignmentScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          volunteerName,
+                          widget.volunteerName,
                           style: AppFonts.heading(
                             color: Colors.white,
                             fontSize: 15,
@@ -151,14 +318,14 @@ class CounterAssignmentScreen extends StatelessWidget {
                           text: TextSpan(
                             children: [
                               TextSpan(
-                                text: volunteerCode,
+                                text: widget.volunteerCode,
                                 style: AppFonts.mono(
                                   color: TEDxColors.textSecondary,
                                   fontSize: 12,
                                 ),
                               ),
                               TextSpan(
-                                text: ' · Counter volunteer',
+                                text: ' · Operating volunteer',
                                 style: AppFonts.body(
                                   color: TEDxColors.textSecondary,
                                   fontSize: 12,
@@ -172,9 +339,9 @@ class CounterAssignmentScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // Counter Permissions Box
+              // Counter Permissions Box for active selection
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),
@@ -187,7 +354,7 @@ class CounterAssignmentScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'COUNTER PERMISSIONS',
+                      'PERMISSIONS FOR ${_selectedCounter.code}',
                       style: AppFonts.mono(
                         color: TEDxColors.textMuted,
                         fontSize: 10,
@@ -198,24 +365,24 @@ class CounterAssignmentScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     _permissionRow('Scan attendee QR codes'),
                     const SizedBox(height: 8),
-                    _permissionRow('Redeem ${counter.benefit}'),
+                    _permissionRow('Redeem ${_selectedCounter.benefit}'),
                     const SizedBox(height: 8),
-                    _permissionRow('View counter scan history'),
+                    _permissionRow('Audit scan events for ${_selectedCounter.name}'),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 36),
+              const SizedBox(height: 32),
 
               ActionButton(
-                text: 'START SCANNING',
+                text: 'CONFIRM COUNTER & START SCANNING',
                 trailingArrow: '→',
-                onPressed: onStartScanning,
+                onPressed: _handleConfirm,
               ),
               const SizedBox(height: 12),
               Center(
                 child: Text(
-                  'Assigned by the event operations team',
+                  'Counter context is recorded with every scan and redemption',
                   style: AppFonts.body(
                     color: TEDxColors.textMuted,
                     fontSize: 11,
