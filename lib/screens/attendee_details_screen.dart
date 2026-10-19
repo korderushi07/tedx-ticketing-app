@@ -22,7 +22,10 @@ class AttendeeDetailsScreen extends StatelessWidget {
       MapEntry('Benefit', scan.benefit),
       MapEntry('Counter', scan.counter),
       MapEntry('Time', scan.time),
-      const MapEntry('Volunteer', 'Rahul Sharma'),
+      MapEntry(
+        'Volunteer',
+        scan.volunteerName.isNotEmpty ? scan.volunteerName : 'Volunteer',
+      ),
       MapEntry('Record ID', scan.id),
     ];
 
@@ -60,7 +63,10 @@ class AttendeeDetailsScreen extends StatelessWidget {
 
               // Status Tag
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),

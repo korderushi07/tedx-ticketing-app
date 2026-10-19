@@ -1,4 +1,4 @@
-enum Outcome { approved, redeemed, notEligible, invalid, network }
+enum Outcome { ready, approved, redeemed, notEligible, invalid, network }
 
 enum CounterKey { food, merch, goodie, workshop }
 
@@ -117,6 +117,16 @@ class ScanModel {
   final int? attendeeId;
   final int? addonId;
   final int? counterId;
+  final String? orderId;
+  final String volunteerName;
+  final List<AttendeeModel> orderTickets;
+  final String? statusMessage;
+  final String? previousRedemptionAt;
+  final String? previousRedemptionCounter;
+  final String? previousRedemptionVolunteer;
+  final String? previousRedemptionClaimant;
+  final bool orderTicketsLoading;
+  final bool orderTicketsLoadFailed;
 
   const ScanModel({
     required this.id,
@@ -130,6 +140,16 @@ class ScanModel {
     this.attendeeId,
     this.addonId,
     this.counterId,
+    this.orderId,
+    this.volunteerName = '',
+    this.orderTickets = const [],
+    this.statusMessage,
+    this.previousRedemptionAt,
+    this.previousRedemptionCounter,
+    this.previousRedemptionVolunteer,
+    this.previousRedemptionClaimant,
+    this.orderTicketsLoading = false,
+    this.orderTicketsLoadFailed = false,
   });
 
   ScanModel copyWith({
@@ -144,6 +164,16 @@ class ScanModel {
     int? attendeeId,
     int? addonId,
     int? counterId,
+    String? orderId,
+    String? volunteerName,
+    List<AttendeeModel>? orderTickets,
+    String? statusMessage,
+    String? previousRedemptionAt,
+    String? previousRedemptionCounter,
+    String? previousRedemptionVolunteer,
+    String? previousRedemptionClaimant,
+    bool? orderTicketsLoading,
+    bool? orderTicketsLoadFailed,
   }) {
     return ScanModel(
       id: id ?? this.id,
@@ -157,22 +187,90 @@ class ScanModel {
       attendeeId: attendeeId ?? this.attendeeId,
       addonId: addonId ?? this.addonId,
       counterId: counterId ?? this.counterId,
+      orderId: orderId ?? this.orderId,
+      volunteerName: volunteerName ?? this.volunteerName,
+      orderTickets: orderTickets ?? this.orderTickets,
+      statusMessage: statusMessage ?? this.statusMessage,
+      previousRedemptionAt: previousRedemptionAt ?? this.previousRedemptionAt,
+      previousRedemptionCounter:
+          previousRedemptionCounter ?? this.previousRedemptionCounter,
+      previousRedemptionVolunteer:
+          previousRedemptionVolunteer ?? this.previousRedemptionVolunteer,
+      previousRedemptionClaimant:
+          previousRedemptionClaimant ?? this.previousRedemptionClaimant,
+      orderTicketsLoading: orderTicketsLoading ?? this.orderTicketsLoading,
+      orderTicketsLoadFailed:
+          orderTicketsLoadFailed ?? this.orderTicketsLoadFailed,
     );
   }
 }
 
 class AttendeeModel {
+  final int? attendeeId;
   final String ticketId;
   final String name;
   final String ticketType; // VIP, Premium, Standard
   final List<String> benefits;
+  final int? addonId;
+  final bool? isEligible;
+  final bool isRedeemed;
+  final Outcome? redemptionOutcome;
+  final String? statusMessage;
+  final String? redeemedAt;
+  final String? redeemedCounter;
+  final String? redeemedBy;
+  final String? claimedBy;
 
   const AttendeeModel({
+    this.attendeeId,
     required this.ticketId,
     required this.name,
     required this.ticketType,
     required this.benefits,
+    this.addonId,
+    this.isEligible,
+    this.isRedeemed = false,
+    this.redemptionOutcome,
+    this.statusMessage,
+    this.redeemedAt,
+    this.redeemedCounter,
+    this.redeemedBy,
+    this.claimedBy,
   });
+
+  AttendeeModel copyWith({
+    int? attendeeId,
+    String? ticketId,
+    String? name,
+    String? ticketType,
+    List<String>? benefits,
+    int? addonId,
+    bool? isEligible,
+    bool? isRedeemed,
+    Outcome? redemptionOutcome,
+    String? statusMessage,
+    String? redeemedAt,
+    String? redeemedCounter,
+    String? redeemedBy,
+    String? claimedBy,
+  }) {
+    return AttendeeModel(
+      attendeeId: attendeeId ?? this.attendeeId,
+      ticketId: ticketId ?? this.ticketId,
+      name: name ?? this.name,
+      ticketType: ticketType ?? this.ticketType,
+      benefits: benefits ?? this.benefits,
+      addonId: addonId ?? this.addonId,
+      isEligible: isEligible ?? this.isEligible,
+      isRedeemed: isRedeemed ?? this.isRedeemed,
+      redemptionOutcome: redemptionOutcome ?? this.redemptionOutcome,
+      statusMessage: statusMessage ?? this.statusMessage,
+      redeemedAt: redeemedAt ?? this.redeemedAt,
+      redeemedCounter: redeemedCounter ?? this.redeemedCounter,
+      redeemedBy: redeemedBy ?? this.redeemedBy,
+      claimedBy: claimedBy ?? this.claimedBy,
+    );
+  }
 }
 
 class VolunteerModel {
@@ -189,7 +287,7 @@ class VolunteerModel {
   });
 }
 
-const String outcomeApprovedLabel = 'Approved';
+const String outcomeApprovedLabel = 'Redeemed';
 const String outcomeRedeemedLabel = 'Already redeemed';
 const String outcomeNotEligibleLabel = 'Not eligible';
 const String outcomeInvalidLabel = 'Invalid QR';
@@ -197,6 +295,8 @@ const String outcomeNetworkLabel = 'Connection lost';
 
 String getOutcomeLabel(Outcome outcome) {
   switch (outcome) {
+    case Outcome.ready:
+      return 'Eligible - confirmation required';
     case Outcome.approved:
       return outcomeApprovedLabel;
     case Outcome.redeemed:

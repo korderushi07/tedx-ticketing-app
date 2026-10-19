@@ -37,6 +37,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int? _dbSuccessfulScans;
   int? _dbRemainingEligible;
+  String? _statsError;
   bool _isLoadingStats = false;
 
   @override
@@ -60,25 +61,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final counterId = widget.counter.id;
     if (counterId == null) {
-      setState(() => _isLoadingStats = false);
+      setState(() {
+        _isLoadingStats = false;
+        _statsError = 'Select an active counter to load its statistics.';
+      });
       return;
     }
 
     try {
       final res = await ApiService().getCounterStats(counterId);
-      if (mounted && res.isNotEmpty) {
+      if (mounted) {
         setState(() {
           _dbSuccessfulScans = res['successful_claims'] as int?;
           _dbRemainingEligible = res['remaining_eligible'] as int?;
+          _statsError = null;
           _isLoadingStats = false;
         });
-      } else if (mounted) {
-        setState(() => _isLoadingStats = false);
       }
     } catch (e) {
       debugPrint('[DashboardScreen] Error fetching DB stats: $e');
       if (mounted) {
-        setState(() => _isLoadingStats = false);
+        setState(() {
+          _dbSuccessfulScans = null;
+          _dbRemainingEligible = null;
+          _statsError = 'Statistics are unavailable. Pull down to retry.';
+          _isLoadingStats = false;
+        });
       }
     }
   }
@@ -91,9 +99,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         _fetchStats();
       }
     });
-
-    final successfulTotal = _dbSuccessfulScans ?? 0;
-    final remainingEligible = _dbRemainingEligible ?? 0;
 
     final scansToDisplay = widget.recentScans.take(3).toList();
 
@@ -338,7 +343,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           Row(
                             children: [
                               Text(
-                                successfulTotal.toString(),
+                                _dbSuccessfulScans?.toString() ?? '—',
                                 style: AppFonts.heading(
                                   color: Colors.white,
                                   fontSize: 42,
@@ -361,7 +366,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Successful scans today',
+                            'Successful redemptions',
                             style: AppFonts.body(
                               color: const Color(0xFFA1A1AA),
                               fontSize: 13,
@@ -381,7 +386,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            remainingEligible.clamp(0, 9999).toString(),
+                            _dbRemainingEligible == null
+                                ? '—'
+                                : _dbRemainingEligible!
+                                      .clamp(0, 9999)
+                                      .toString(),
                             style: AppFonts.heading(
                               color: Colors.white,
                               fontSize: 42,
@@ -403,6 +412,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
+                if (_statsError != null) ...[
+                  Text(
+                    _statsError!,
+                    style: AppFonts.body(
+                      color: TEDxColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 const Divider(color: Color(0xFF1F1F23), height: 1),
                 const SizedBox(height: 28),
 

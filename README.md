@@ -57,7 +57,7 @@ The solution has two primary components maintained separately.
 │                                 │
 │ Login • QR Scanner • Result     │
 │ Confirm Redemption • History    │
-│ Riverpod • Dio • Secure Storage │
+│ Riverpod • HTTP • Secure Storage │
 └────────────────┬────────────────┘
                  │ HTTPS / REST + JWT
                  ▼
@@ -90,8 +90,8 @@ interaction. - Sends QR tokens and user actions to the backend. - Stores
 authentication credentials securely using the existing secure-storage
 implementation. - Displays server responses; it does not manufacture
 attendee validity, eligibility, ticket IDs, redemption timestamps, or
-success states. - Uses Riverpod for shared application state and Dio for
-API communication, following existing project conventions.
+success states. - Uses Riverpod for shared application state and the
+existing `http`-based API service.
 
 **FastAPI backend** - Owns authentication, authorization,
 ticket import and validation, counter catalog/context, entitlement validation, scan auditing, duplicate protection, persistence, and history. - Validates
@@ -147,19 +147,15 @@ Rules:
 4. If not found, reject the QR as an unknown ticket. Do not create a ticket record from a scanned QR.
 5. Continue to use the existing backend entitlement/redemption rules, updated only as needed to read imported ticket data.
 
-### Fresh development test setup
+### Development sample setup
 
-The user has explicitly requested replacing the old test QR pack and starting fresh with this sample data. Implement a deliberate command such as a development-only `reset-test-data`/`seed-sample-tickets` workflow (use the project's actual command conventions) that:
-
-- verifies the environment is development/test and prints the resolved database path;
-- removes only the previous generated test QR assets and identifiable test-only ticket/scan/redemption rows;
-- never touches production data or records that cannot be confidently identified as test-only;
-- seeds the four sample ticket rows idempotently;
-- generates a fresh QR image for each sample `ticket_id` plus a separate unknown-ticket QR for negative testing;
-- outputs a manifest mapping QR filename to `ticket_id` and removes stale QR images from the designated test-assets folder;
-- keeps all cleanup explicit; never runs this reset automatically on app/backend startup.
-
-If the existing database mixes real and test records and they cannot be safely distinguished, do not delete rows. Create a clean, separate development database and point the development configuration at it instead.
+Run `tedx-backend/seed_sample_tickets.py` only against a dedicated SQLite
+development/test database whose filename contains `dev` or `test`. It
+idempotently imports the four sample records and writes five ticket-ID-only
+QR images under `tedx-backend/qr_codes/dev_samples/`. The operation never
+clears tickets, scan audits, or redemptions. Its legacy entry point
+`reset_test_data.py` now performs the same non-destructive seed; it is not a
+database reset.
 
 ------------------------------------------------------------------------
 
@@ -372,8 +368,7 @@ implementation, then ask for clarification rather than inventing policy.
 
 ### Networking and errors
 
--   Reuse the existing Dio client, base URL configuration, interceptors,
-    and API service abstractions.
+-   Reuse the existing `http` API service and base URL configuration.
 -   Do not scatter raw HTTP calls throughout widgets.
 -   Handle loading, timeout, connectivity, authentication expiry,
     validation, `409 Conflict`, and server errors explicitly.
@@ -440,7 +435,9 @@ implementation, then ask for clarification rather than inventing policy.
 -   Log the resolved database path in a safe development diagnostic if
     useful, but never log credentials or tokens.
 -   Never automatically delete, recreate, or reseed the database during startup.
--   For the explicitly requested fresh test setup, create a deliberate development-only reset/seed command that removes only prior generated test QR files and known test-only records, then seeds the documented sample tickets. Confirm the resolved DB path and environment first. Never remove real attendee data or production data.
+-   Use only the existing non-destructive development seed. Confirm the
+    resolved database path and environment first; never clear attendee,
+    scan-audit, or redemption records.
 -   Before importing or adding data, verify the active database path and back up important data if necessary.
 
 ### Authentication and authorization
@@ -528,7 +525,10 @@ verification, database persistence, or duplicate protection works.
 
 ## 11. Safe Test Data and QR Testing
 
-Use the sample ticket dataset defined in Section 3. The user has explicitly requested a one-time fresh start for previous test QR codes and test-only data. Implement this as an explicit, development-only reset-and-seed command—not as startup behavior. Before running it: (1) confirm the resolved database path, (2) confirm development/test environment, (3) remove only previously generated test QR assets and identifiable test-only records, (4) preserve real attendee/production records, and (5) seed the sample dataset idempotently. If existing data cannot be reliably distinguished as test-only, stop and report the ambiguity instead of deleting it.
+Use the sample ticket dataset defined in Section 3 with the backend's
+explicit development-only, non-destructive seed command. It must target a
+dedicated dev/test database and preserve all existing tickets, audits, and
+redemptions. Do not implement or run a database reset.
 
 Recommended test cases:
 
@@ -564,7 +564,9 @@ Recommended test cases:
   Expired or invalid JWT              Request is unauthorized
   -----------------------------------------------------------------------
 
-Generate fresh QR images from the exact `ticket_id` values (or another payload only if the current scanner contract requires it). The new sample dataset should replace the previous test QR pack; do not leave stale QR images in the active test-assets folder. Keep an invalid test QR separate from valid sample tickets.
+Generate QR images from the exact `ticket_id` values. Keep sample images in
+`tedx-backend/qr_codes/dev_samples/`; preserve any QR assets whose provenance
+cannot be established.
 
 **Never**: reset the database automatically at startup; seed in production; delete real attendee data; assume a scan is a redemption; trust a client-generated success result; or claim a test passed unless it actually ran.
 

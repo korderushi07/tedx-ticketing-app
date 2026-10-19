@@ -19,7 +19,8 @@ class QRScannerScreen extends StatefulWidget {
   State<QRScannerScreen> createState() => _QRScannerScreenState();
 }
 
-class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProviderStateMixin {
+class _QRScannerScreenState extends State<QRScannerScreen>
+    with SingleTickerProviderStateMixin {
   late final MobileScannerController _controller;
   bool _hasPermission = false;
   bool _permissionChecked = false;
@@ -53,6 +54,23 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
     super.dispose();
   }
 
+  void _submitTicketId(String value) {
+    if (_isProcessing) return;
+    final ticketId = value.trim();
+    if (ticketId.isEmpty) {
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+    widget.onScanToken(ticketId);
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    });
+  }
+
   void _onDetect(BarcodeCapture capture) {
     if (_isProcessing) return;
     final barcodes = capture.barcodes;
@@ -61,19 +79,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
     final raw = barcodes.first.rawValue;
     if (raw == null || raw.trim().isEmpty) return;
 
-    setState(() {
-      _isProcessing = true;
-    });
-
-    widget.onScanToken(raw.trim());
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-        });
-      }
-    });
+    _submitTicketId(raw);
   }
 
   @override
@@ -163,7 +169,10 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
                     decoration: BoxDecoration(
                       color: const Color(0xFF0D0D0E),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF26262A), width: 1),
+                      border: Border.all(
+                        color: const Color(0xFF26262A),
+                        width: 1,
+                      ),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(7),
@@ -172,7 +181,9 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
                         children: [
                           if (!_permissionChecked)
                             const Center(
-                              child: CircularProgressIndicator(color: TEDxColors.tedRed),
+                              child: CircularProgressIndicator(
+                                color: TEDxColors.tedRed,
+                              ),
                             )
                           else if (!_hasPermission)
                             _buildPermissionDeniedView()
@@ -192,11 +203,16 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
                               left: 12,
                               right: 12,
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(Icons.fiber_manual_record, size: 7, color: Color(0xFF10B981)),
+                                      const Icon(
+                                        Icons.fiber_manual_record,
+                                        size: 7,
+                                        color: Color(0xFF10B981),
+                                      ),
                                       const SizedBox(width: 6),
                                       Text(
                                         'LIVE SCANNER',
@@ -217,8 +233,12 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
                                           setState(() => _torchOn = !_torchOn);
                                         },
                                         icon: Icon(
-                                          _torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                                          color: _torchOn ? Colors.amber : Colors.white70,
+                                          _torchOn
+                                              ? Icons.flash_on_rounded
+                                              : Icons.flash_off_rounded,
+                                          color: _torchOn
+                                              ? Colors.amber
+                                              : Colors.white70,
                                           size: 18,
                                         ),
                                         style: IconButton.styleFrom(
@@ -229,7 +249,8 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
                                       ),
                                       const SizedBox(width: 6),
                                       IconButton(
-                                        onPressed: () => _controller.switchCamera(),
+                                        onPressed: () =>
+                                            _controller.switchCamera(),
                                         icon: const Icon(
                                           Icons.cameraswitch_rounded,
                                           color: Colors.white70,
@@ -256,7 +277,9 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
                                   children: [
                                     CustomPaint(
                                       size: Size(frameSize, frameSize),
-                                      painter: FramePainter(isProcessing: _isProcessing),
+                                      painter: FramePainter(
+                                        isProcessing: _isProcessing,
+                                      ),
                                     ),
                                     Center(
                                       child: Icon(
@@ -276,12 +299,18 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
                               left: 12,
                               right: 12,
                               child: Text(
-                                _isProcessing ? 'Verifying ticket code...' : 'Position attendee QR inside frame',
+                                _isProcessing
+                                    ? 'Verifying ticket code...'
+                                    : 'Position attendee QR inside frame',
                                 textAlign: TextAlign.center,
                                 style: AppFonts.body(
-                                  color: _isProcessing ? TEDxColors.tedRed : const Color(0xFFA1A1AA),
+                                  color: _isProcessing
+                                      ? TEDxColors.tedRed
+                                      : const Color(0xFFA1A1AA),
                                   fontSize: isSmallScreen ? 11 : 12,
-                                  fontWeight: _isProcessing ? FontWeight.w700 : FontWeight.w400,
+                                  fontWeight: _isProcessing
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
                                 ),
                               ),
                             ),
@@ -291,6 +320,12 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
                     ),
                   ),
                   SizedBox(height: isSmallScreen ? 16 : 22),
+                  ManualTicketEntry(
+                    isSmallScreen: isSmallScreen,
+                    isProcessing: _isProcessing,
+                    onSubmit: _submitTicketId,
+                  ),
+                  SizedBox(height: isSmallScreen ? 18 : 24),
 
                   // Successful Scans Today Row
                   Row(
@@ -335,17 +370,28 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.camera_alt_outlined, size: 40, color: TEDxColors.tedRed),
+            const Icon(
+              Icons.camera_alt_outlined,
+              size: 40,
+              color: TEDxColors.tedRed,
+            ),
             const SizedBox(height: 12),
             Text(
               'Camera Access Required',
-              style: AppFonts.heading(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+              style: AppFonts.heading(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
               'Camera access is needed to scan attendee event passes.',
               textAlign: TextAlign.center,
-              style: AppFonts.body(color: const Color(0xFFA1A1AA), fontSize: 12),
+              style: AppFonts.body(
+                color: const Color(0xFFA1A1AA),
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
@@ -370,17 +416,28 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.videocam_off_outlined, size: 40, color: TEDxColors.warning),
+            const Icon(
+              Icons.videocam_off_outlined,
+              size: 40,
+              color: TEDxColors.warning,
+            ),
             const SizedBox(height: 12),
             Text(
               'Camera Unavailable',
-              style: AppFonts.heading(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+              style: AppFonts.heading(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
               'Camera stream interrupted ($error).\nTap retry to restart camera.',
               textAlign: TextAlign.center,
-              style: AppFonts.body(color: const Color(0xFFA1A1AA), fontSize: 12),
+              style: AppFonts.body(
+                color: const Color(0xFFA1A1AA),
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 16),
             OutlinedButton(
@@ -398,6 +455,118 @@ class _QRScannerScreenState extends State<QRScannerScreen> with SingleTickerProv
   }
 }
 
+class ManualTicketEntry extends StatefulWidget {
+  final bool isSmallScreen;
+  final bool isProcessing;
+  final ValueChanged<String> onSubmit;
+
+  const ManualTicketEntry({
+    super.key,
+    required this.isSmallScreen,
+    required this.isProcessing,
+    required this.onSubmit,
+  });
+
+  @override
+  State<ManualTicketEntry> createState() => _ManualTicketEntryState();
+}
+
+class _ManualTicketEntryState extends State<ManualTicketEntry> {
+  final TextEditingController _controller = TextEditingController();
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final ticketId = _controller.text.trim();
+    if (ticketId.isEmpty) {
+      setState(() => _errorText = 'Enter a ticket ID to validate.');
+      return;
+    }
+    setState(() => _errorText = null);
+    widget.onSubmit(ticketId);
+    _controller.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'ENTER TICKET ID',
+          style: AppFonts.mono(
+            color: TEDxColors.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _controller,
+          enabled: !widget.isProcessing,
+          textCapitalization: TextCapitalization.characters,
+          textInputAction: TextInputAction.done,
+          onChanged: (_) {
+            if (_errorText != null) setState(() => _errorText = null);
+          },
+          onSubmitted: (_) => _submit(),
+          style: AppFonts.mono(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Type or paste ticket ID',
+            hintStyle: AppFonts.body(color: TEDxColors.textMuted, fontSize: 13),
+            errorText: _errorText,
+            prefixIcon: const Icon(
+              Icons.confirmation_number_outlined,
+              color: TEDxColors.textMuted,
+              size: 19,
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: widget.isSmallScreen ? 12 : 15,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: widget.isProcessing ? null : _submit,
+            icon: widget.isProcessing
+                ? const SizedBox(
+                    width: 17,
+                    height: 17,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.verified_outlined, size: 19),
+            label: Text(
+              widget.isProcessing
+                  ? 'VALIDATING TICKET...'
+                  : 'VALIDATE TICKET ID',
+            ),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Custom painter for the 4 corner brackets ┌ ┐ └ ┘ inside the scanner frame
 class FramePainter extends CustomPainter {
   final bool isProcessing;
@@ -406,7 +575,9 @@ class FramePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = isProcessing ? const Color(0xFF10B981) : Colors.white.withValues(alpha: 0.85)
+      ..color = isProcessing
+          ? const Color(0xFF10B981)
+          : Colors.white.withValues(alpha: 0.85)
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.square;
@@ -423,13 +594,26 @@ class FramePainter extends CustomPainter {
 
     // Bottom-Left
     canvas.drawLine(Offset(0, size.height), Offset(len, size.height), paint);
-    canvas.drawLine(Offset(0, size.height), Offset(0, size.height - len), paint);
+    canvas.drawLine(
+      Offset(0, size.height),
+      Offset(0, size.height - len),
+      paint,
+    );
 
     // Bottom-Right
-    canvas.drawLine(Offset(size.width, size.height), Offset(size.width - len, size.height), paint);
-    canvas.drawLine(Offset(size.width, size.height), Offset(size.width, size.height - len), paint);
+    canvas.drawLine(
+      Offset(size.width, size.height),
+      Offset(size.width - len, size.height),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width, size.height),
+      Offset(size.width, size.height - len),
+      paint,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant FramePainter oldDelegate) => oldDelegate.isProcessing != isProcessing;
+  bool shouldRepaint(covariant FramePainter oldDelegate) =>
+      oldDelegate.isProcessing != isProcessing;
 }

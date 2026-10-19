@@ -51,6 +51,26 @@ void main() {
             counter: CounterInfo.food,
             volunteerName: 'Rahul Sharma',
             volunteerCode: 'VOL-001',
+            counterLoader: () async => [
+              const CounterInfo(
+                key: CounterKey.food,
+                name: 'Food Counter 01',
+                benefit: 'Food',
+                code: 'C02',
+                total: 0,
+                id: 2,
+                addonId: 1,
+              ),
+              const CounterInfo(
+                key: CounterKey.merch,
+                name: 'T-Shirt Counter',
+                benefit: 'T-Shirt',
+                code: 'C03',
+                total: 0,
+                id: 3,
+                addonId: 2,
+              ),
+            ],
             onCounterSelected: (c) => selected = c,
             onStartScanning: () => started = true,
           ),
@@ -70,6 +90,40 @@ void main() {
 
       expect(started, isTrue);
       expect(selected, isNotNull);
+    },
+  );
+
+  testWidgets(
+    'CounterAssignmentScreen does not use local counters when loading fails',
+    (WidgetTester tester) async {
+      var started = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CounterAssignmentScreen(
+            counter: CounterInfo.food,
+            volunteerName: 'Volunteer',
+            volunteerCode: 'VOL-001',
+            counterLoader: () async => [],
+            onStartScanning: () => started = true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'No active counters are available. Contact an administrator.',
+        ),
+        findsOneWidget,
+      );
+      final confirmButton = tester.widget<ElevatedButton>(
+        find.ancestor(
+          of: find.text('CONFIRM COUNTER & START SCANNING'),
+          matching: find.byType(ElevatedButton),
+        ),
+      );
+      expect(confirmButton.onPressed, isNull);
+      expect(started, isFalse);
     },
   );
 

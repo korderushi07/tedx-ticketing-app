@@ -6,6 +6,7 @@ import 'theme/app_theme.dart';
 import 'models/app_models.dart';
 import 'widgets/tedx_components.dart';
 import 'services/api_service.dart';
+import 'services/redemption_batch_service.dart';
 import 'providers/redemption_providers.dart';
 
 // Screens
@@ -62,6 +63,8 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
 
   ScanModel? _selectedDetailScan;
   Timer? _verifyingTimer;
+  bool _isRedemptionProcessing = false;
+  final Set<String> _selectedRedemptionKeys = {};
 
   @override
   void initState() {
@@ -81,7 +84,7 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
           }
           _volunteerName = api.assignedVolunteerName ?? 'Volunteer';
           _volunteerCode = api.assignedVolunteerCode ?? '';
-          _screen = 'dashboard';
+          _screen = api.assignedCounter == null ? 'counter' : 'dashboard';
         });
         ref.read(redemptionHistoryProvider.notifier).refresh();
         return;
@@ -120,21 +123,29 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
   CounterInfo get _activeCounter => _assignedCounter;
 
   Future<void> _handleScanToken(String qrToken) async {
-    if (_screen == 'verifying') return;
+    if (_screen == 'verifying' || _isRedemptionProcessing) return;
 
     final selectedCounter = _activeCounter;
     final tokenClean = qrToken.trim();
 
     setState(() {
       _screen = 'verifying';
+      _selectedRedemptionKeys.clear();
     });
 
     Outcome outcome = Outcome.network;
     String name = 'Attendee';
     String ticketId = tokenClean.toUpperCase();
     String pass = 'VIP';
+    String? orderId;
+    final orderTickets = <AttendeeModel>[];
     int? attendeeId;
     int? addonId;
+    String? statusMessage;
+    String? previousRedemptionAt;
+    String? previousRedemptionCounter;
+    String? previousRedemptionVolunteer;
+    String? previousRedemptionClaimant;
     final counterId = selectedCounter.id;
     final requiredAddonId = selectedCounter.addonId;
     if (counterId == null || requiredAddonId == null) {
@@ -146,16 +157,30 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
     }
 
     try {
-      final res = await ApiService().verifyQR(
-        tokenClean,
-        counterId: counterId,
-      );
+      final res = await ApiService().verifyQR(tokenClean, counterId: counterId);
       if (res.containsKey('attendee') && res['attendee'] != null) {
         final att = res['attendee'] as Map<String, dynamic>;
         attendeeId = att['id'] as int?;
         name = att['name']?.toString() ?? name;
         ticketId = att['ticket_id']?.toString() ?? ticketId;
         pass = att['ticket_type']?.toString() ?? pass;
+        orderId = att['order_id']?.toString();
+
+        final rawOrderTickets = res['order_tickets'];
+        if (rawOrderTickets is List) {
+          for (final rawTicket in rawOrderTickets) {
+            if (rawTicket is! Map) continue;
+            orderTickets.add(
+              AttendeeModel(
+                attendeeId: rawTicket['id'] as int?,
+                ticketId: rawTicket['ticket_id']?.toString() ?? '',
+                name: rawTicket['name']?.toString() ?? 'Attendee',
+                ticketType: rawTicket['ticket_type']?.toString() ?? 'Ticket',
+                benefits: const [],
+              ),
+            );
+          }
+        }
 
         if (res.containsKey('entitlements') && res['entitlements'] is List) {
           final ents = res['entitlements'] as List<dynamic>;
@@ -164,21 +189,22 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
           for (final e in ents) {
             final item = e as Map<String, dynamic>;
             final addonIdVal = item['addon_id'] as int?;
-            final remainingQty =
-                (item['remaining_quantity'] as int?) ??
-                (item['is_redeemed'] == true ? 0 : 1);
-            final claimedQty = (item['claimed_quantity'] as int?) ?? 0;
+            final remainingQty = item['remaining_quantity'] as int? ?? 0;
 
             if (addonIdVal == requiredAddonId) {
               foundCounterEntitlement = true;
               addonId = addonIdVal;
-
-              if (remainingQty <= 0 ||
-                  claimedQty > 0 ||
-                  item['is_redeemed'] == true) {
+              if (remainingQty <= 0) {
                 outcome = Outcome.redeemed;
+                statusMessage = 'This benefit was already redeemed.';
+                previousRedemptionAt = item['claimed_at']?.toString();
+                previousRedemptionCounter = item['counter_code']?.toString();
+                previousRedemptionVolunteer = item['volunteer_name']
+                    ?.toString();
+                previousRedemptionClaimant = item['claimant_name']?.toString();
               } else {
-                outcome = Outcome.approved;
+                outcome = Outcome.ready;
+                statusMessage = 'No redemption has been recorded yet.';
               }
               break;
             }
@@ -186,66 +212,64 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
 
           if (!foundCounterEntitlement) {
             outcome = Outcome.notEligible;
+            statusMessage =
+                'This ${pass.toLowerCase()} ticket does not include ${selectedCounter.benefit}.';
           }
         } else {
           outcome = Outcome.network;
+          statusMessage = 'The ticket eligibility could not be verified.';
         }
-
-        // If eligible and valid IDs are present, execute backend claim redemption
-        if (outcome == Outcome.approved &&
-            attendeeId != null &&
-            addonId != null) {
-          try {
-            final claimRes = await ApiService().claimRedemption(
-              attendeeId: attendeeId,
-              addonId: addonId,
-              counterId: counterId,
-            );
-            if (claimRes['success'] == true) {
-              outcome = Outcome.approved;
-              // Refresh persistent history provider in Riverpod upon successful redemption claim
-              ref.read(redemptionHistoryProvider.notifier).refresh();
-            } else if (claimRes['error'] == 'ALREADY_CLAIMED') {
-              outcome = Outcome.redeemed;
-            } else if (claimRes['error'] == 'NOT_ELIGIBLE' ||
-                claimRes['error'] == 'COUNTER_UNAUTHORIZED') {
-              outcome = Outcome.notEligible;
-            } else {
-              outcome = Outcome.network;
-            }
-          } catch (claimErr) {
-            final errStr = claimErr.toString();
-            if (errStr.contains('409') || errStr.contains('ALREADY_CLAIMED')) {
-              outcome = Outcome.redeemed;
-            } else if (errStr.contains('COUNTER_UNAUTHORIZED')) {
-              outcome = Outcome.notEligible;
-            } else if (errStr.contains('403') ||
-                errStr.contains('NOT_ELIGIBLE')) {
-              outcome = Outcome.notEligible;
-            } else {
-              outcome = Outcome.network;
+      } else {
+        final error = res['error']?.toString();
+        statusMessage = res['message']?.toString();
+        outcome = switch (error) {
+          'INVALID_QR' => Outcome.invalid,
+          'NOT_ELIGIBLE' => Outcome.notEligible,
+          'ALREADY_CLAIMED' => Outcome.redeemed,
+          _ => Outcome.network,
+        };
+      }
+      if (outcome == Outcome.redeemed && attendeeId != null) {
+        try {
+          final entitlements = await ApiService().getAttendeeEntitlements(
+            attendeeId,
+          );
+          for (final entitlement in entitlements) {
+            if (entitlement is Map &&
+                entitlement['addon_id'] == requiredAddonId) {
+              previousRedemptionAt = entitlement['claimed_at']?.toString();
+              previousRedemptionCounter = entitlement['counter_code']
+                  ?.toString();
+              previousRedemptionVolunteer = entitlement['volunteer_name']
+                  ?.toString();
+              previousRedemptionClaimant = entitlement['claimant_name']
+                  ?.toString();
+              break;
             }
           }
-        } else if (outcome == Outcome.approved) {
-          outcome = Outcome.network;
+        } catch (error) {
+          debugPrint('[REDEMPTION DETAILS ERROR] $error');
         }
-      } else if (res['error'] == 'INVALID_QR') {
-        outcome = Outcome.invalid;
       }
     } catch (e) {
       debugPrint('[VERIFY QR ERROR] $e');
       final errStr = e.toString();
-      if (errStr.contains('404') || errStr.contains('INVALID_QR')) {
+      if (errStr.contains('INVALID_QR')) {
         outcome = Outcome.invalid;
+        statusMessage = 'This QR code is not registered with TEDx.';
         name = 'Unknown';
         ticketId = 'INVALID';
         pass = 'NONE';
       } else if (errStr.contains('403') || errStr.contains('NOT_ELIGIBLE')) {
         outcome = Outcome.notEligible;
+        statusMessage = 'This ticket is not eligible for this benefit.';
       } else if (errStr.contains('409') || errStr.contains('ALREADY_CLAIMED')) {
         outcome = Outcome.redeemed;
+        statusMessage = 'This benefit was already redeemed.';
       } else {
         outcome = Outcome.network;
+        statusMessage =
+            'Ticket verification failed. Check your connection and try again.';
         name = 'Unknown';
         ticketId = 'INVALID';
         pass = 'NONE';
@@ -270,30 +294,324 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
       attendeeId: attendeeId,
       addonId: addonId,
       counterId: counterId,
+      orderId: orderId,
+      volunteerName: _volunteerName,
+      orderTickets: orderTickets,
+      orderTicketsLoading: orderTickets.isNotEmpty,
+      statusMessage: statusMessage,
+      previousRedemptionAt: previousRedemptionAt,
+      previousRedemptionCounter: previousRedemptionCounter,
+      previousRedemptionVolunteer: previousRedemptionVolunteer,
+      previousRedemptionClaimant: previousRedemptionClaimant,
     );
 
     if (!mounted) return;
     ref.read(currentScanProvider.notifier).setScan(scan);
     setState(() {
-      if (scan.outcome == Outcome.approved) {
-        _addedCount[_counterKey] = (_addedCount[_counterKey] ?? 0) + 1;
-      }
       _screen = 'outcome';
     });
+    if (scan.orderTickets.isNotEmpty) {
+      unawaited(_loadOrderTicketEligibility(scan));
+    }
+  }
+
+  Future<void> _loadOrderTicketEligibility(
+    ScanModel scan, {
+    bool retryFailedOnly = false,
+  }) async {
+    final pending = retryFailedOnly
+        ? scan.orderTickets.where((ticket) => ticket.isEligible == null)
+        : scan.orderTickets;
+    if (pending.isEmpty) return;
+
+    final current = ref.read(currentScanProvider);
+    if (current?.id != scan.id) return;
+    ref
+        .read(currentScanProvider.notifier)
+        .setScan(scan.copyWith(orderTicketsLoading: true));
+
+    var hadFailure = false;
+    final verified = await Future.wait(
+      scan.orderTickets.map((ticket) async {
+        if (!pending.any((item) => item.ticketId == ticket.ticketId)) {
+          return ticket;
+        }
+        if (ticket.attendeeId == null || scan.addonId == null) {
+          hadFailure = true;
+          return ticket.copyWith(
+            isEligible: null,
+            statusMessage: 'Could not verify this ticket.',
+          );
+        }
+
+        try {
+          final entitlements = await ApiService().getAttendeeEntitlements(
+            ticket.attendeeId!,
+          );
+          Map? selectedEntitlement;
+          for (final entitlement in entitlements) {
+            if (entitlement is Map && entitlement['addon_id'] == scan.addonId) {
+              selectedEntitlement = entitlement;
+              break;
+            }
+          }
+
+          if (selectedEntitlement == null) {
+            return ticket.copyWith(
+              addonId: scan.addonId,
+              isEligible: false,
+              isRedeemed: false,
+              statusMessage: 'This ticket does not include ${scan.benefit}.',
+            );
+          }
+
+          final remaining = selectedEntitlement['remaining_quantity'];
+          final isRedeemed = remaining is num
+              ? remaining <= 0
+              : selectedEntitlement['status'] == 'CLAIMED';
+          return ticket.copyWith(
+            addonId: scan.addonId,
+            isEligible: !isRedeemed,
+            isRedeemed: isRedeemed,
+            statusMessage: isRedeemed
+                ? 'Already redeemed'
+                : 'Eligible for ${scan.benefit}',
+            redeemedAt: selectedEntitlement['claimed_at']?.toString(),
+            redeemedCounter: selectedEntitlement['counter_code']?.toString(),
+            redeemedBy: selectedEntitlement['volunteer_name']?.toString(),
+            claimedBy: selectedEntitlement['claimant_name']?.toString(),
+          );
+        } catch (error) {
+          debugPrint(
+            '[RELATED TICKET ELIGIBILITY ERROR] ${ticket.ticketId}: $error',
+          );
+          hadFailure = true;
+          return ticket.copyWith(
+            addonId: scan.addonId,
+            isEligible: null,
+            statusMessage: 'Could not verify this ticket.',
+          );
+        }
+      }),
+    );
+
+    final latest = ref.read(currentScanProvider);
+    if (!mounted || latest?.id != scan.id) return;
+    ref
+        .read(currentScanProvider.notifier)
+        .setScan(
+          latest!.copyWith(
+            orderTickets: verified,
+            orderTicketsLoading: false,
+            orderTicketsLoadFailed: hadFailure,
+          ),
+        );
+  }
+
+  Future<void> _confirmRedemption(ScanModel scan) async {
+    if (_isRedemptionProcessing ||
+        scan.addonId == null ||
+        scan.counterId == null) {
+      return;
+    }
+
+    final selected = <ScanModel>[];
+    if (scan.outcome == Outcome.ready &&
+        scan.attendeeId != null &&
+        _selectedRedemptionKeys.contains(
+          _redemptionKey(scan.ticketId, scan.addonId!),
+        )) {
+      selected.add(scan);
+    }
+    for (final ticket in scan.orderTickets) {
+      final key = _redemptionKey(ticket.ticketId, scan.addonId!);
+      if (!_selectedRedemptionKeys.contains(key) ||
+          ticket.attendeeId == null ||
+          ticket.isEligible != true ||
+          ticket.isRedeemed) {
+        continue;
+      }
+      selected.add(
+        scan.copyWith(
+          id: '${scan.id}-${ticket.ticketId}',
+          name: ticket.name,
+          ticketId: ticket.ticketId,
+          pass: ticket.ticketType,
+          attendeeId: ticket.attendeeId,
+          outcome: Outcome.ready,
+          statusMessage: null,
+          orderTickets: const [],
+        ),
+      );
+    }
+    if (selected.isEmpty) return;
+
+    final selectedKeys = selected
+        .map((item) => _redemptionKey(item.ticketId, item.addonId!))
+        .toList(growable: false);
+    setState(() => _isRedemptionProcessing = true);
+    final results = <String, AttendeeModel>{};
+    try {
+      final batchResults = await RedemptionBatchService().redeemSelected(
+        tickets: selected,
+        claim: (ticket) => ApiService().claimRedemption(
+          attendeeId: ticket.attendeeId!,
+          addonId: ticket.addonId!,
+          counterId: ticket.counterId!,
+        ),
+        reconcile: _redemptionAppearsInHistory,
+      );
+      for (final result in batchResults) {
+        results[result.ticketId] = result;
+      }
+    } finally {
+      if (mounted) {
+        final latest = ref.read(currentScanProvider);
+        if (latest?.id == scan.id) {
+          final updatedOrderTickets = latest!.orderTickets
+              .map((ticket) {
+                final result = results[ticket.ticketId];
+                return result ?? ticket;
+              })
+              .toList(growable: false);
+          final primaryResult = results[scan.ticketId];
+          var updatedScan = latest.copyWith(
+            orderTickets: updatedOrderTickets,
+            orderTicketsLoading: false,
+          );
+          if (primaryResult != null) {
+            updatedScan = updatedScan.copyWith(
+              outcome: primaryResult.redemptionOutcome,
+              statusMessage: primaryResult.statusMessage,
+              previousRedemptionAt: primaryResult.redeemedAt,
+              previousRedemptionCounter: primaryResult.redeemedCounter,
+              previousRedemptionVolunteer: primaryResult.redeemedBy,
+              previousRedemptionClaimant: primaryResult.claimedBy,
+            );
+          }
+          ref.read(currentScanProvider.notifier).setScan(updatedScan);
+          final successes = results.values
+              .where((result) => result.redemptionOutcome == Outcome.approved)
+              .length;
+          _addedCount[_counterKey] =
+              (_addedCount[_counterKey] ?? 0) + successes;
+          _selectedRedemptionKeys.removeAll(selectedKeys);
+          if (successes > 0) {
+            ref.read(redemptionHistoryProvider.notifier).refresh();
+          }
+        }
+        setState(() => _isRedemptionProcessing = false);
+      }
+    }
+  }
+
+  String _redemptionKey(String ticketId, int addonId) => '$ticketId::$addonId';
+
+  void _toggleRelatedTicketSelection(AttendeeModel ticket, ScanModel scan) {
+    if (_isRedemptionProcessing ||
+        ticket.isEligible != true ||
+        ticket.isRedeemed ||
+        ticket.attendeeId == null ||
+        scan.addonId == null) {
+      return;
+    }
+    final key = _redemptionKey(ticket.ticketId, scan.addonId!);
+    setState(() {
+      if (!_selectedRedemptionKeys.add(key)) {
+        _selectedRedemptionKeys.remove(key);
+      }
+    });
+  }
+
+  void _togglePrimaryTicketSelection(ScanModel scan) {
+    if (_isRedemptionProcessing ||
+        scan.outcome != Outcome.ready ||
+        scan.addonId == null) {
+      return;
+    }
+    final key = _redemptionKey(scan.ticketId, scan.addonId!);
+    setState(() {
+      if (!_selectedRedemptionKeys.add(key)) {
+        _selectedRedemptionKeys.remove(key);
+      }
+    });
+  }
+
+  Future<void> _confirmSelectedRedemptions(ScanModel scan) async {
+    if (_selectedRedemptionKeys.isEmpty || _isRedemptionProcessing) return;
+    await _confirmRedemption(scan);
+  }
+
+  Future<void> _retryRelatedTicketEligibility(ScanModel scan) async {
+    if (scan.orderTicketsLoadFailed && scan.orderTickets.isEmpty) {
+      await _handleScanToken(scan.ticketId);
+      return;
+    }
+    await _loadOrderTicketEligibility(scan, retryFailedOnly: true);
+  }
+
+  int _selectedTicketCount(ScanModel scan) {
+    final addonId = scan.addonId;
+    if (addonId == null) return 0;
+    var count = 0;
+    if (scan.outcome == Outcome.ready &&
+        scan.attendeeId != null &&
+        _selectedRedemptionKeys.contains(
+          _redemptionKey(scan.ticketId, addonId),
+        )) {
+      count++;
+    }
+    for (final ticket in scan.orderTickets) {
+      if (ticket.isEligible == true &&
+          !ticket.isRedeemed &&
+          ticket.attendeeId != null &&
+          _selectedRedemptionKeys.contains(
+            _redemptionKey(ticket.ticketId, addonId),
+          )) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  Future<bool> _redemptionAppearsInHistory(ScanModel scan) async {
+    try {
+      final records = await ApiService().getMyHistory();
+      final found = records.any((record) {
+        if (record is! Map) return false;
+        return record['attendee_id'] == scan.attendeeId &&
+            record['addon_id'] == scan.addonId &&
+            record['counter_id'] == scan.counterId;
+      });
+      await ref.read(redemptionHistoryProvider.notifier).refresh();
+      return found;
+    } catch (error) {
+      debugPrint('[REDEMPTION RECONCILIATION ERROR] $error');
+      return false;
+    }
   }
 
   void _onScanNext() {
     ref.read(currentScanProvider.notifier).clearScan();
     setState(() {
+      _selectedRedemptionKeys.clear();
       _screen = 'scanner';
     });
   }
 
+  void _clearRedemptionSelection() {
+    if (_isRedemptionProcessing) return;
+    setState(_selectedRedemptionKeys.clear);
+  }
+
+  Future<void> _retryCurrentVerification(ScanModel scan) async {
+    await _handleScanToken(scan.ticketId);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final showNav = _screen != 'login' &&
-        _screen != 'counter' &&
-        _screen != 'loading';
+    final showNav =
+        _screen != 'login' && _screen != 'counter' && _screen != 'loading';
     final historyAsync = ref.watch(redemptionHistoryProvider);
     final currentScan = ref.watch(currentScanProvider);
 
@@ -305,20 +623,6 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
     final scopedHistory = historyScans
         .where((scan) => scan.counter == _activeCounter.name)
         .toList();
-
-    ScanModel? lastSuccess;
-    if (currentScan != null) {
-      try {
-        lastSuccess = historyScans.firstWhere(
-          (scan) =>
-              scan.outcome == Outcome.approved &&
-              scan.ticketId == currentScan.ticketId &&
-              scan.benefit == currentScan.benefit,
-        );
-      } catch (_) {
-        lastSuccess = null;
-      }
-    }
 
     Widget bodyWidget;
 
@@ -397,8 +701,25 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
     } else if (_screen == 'outcome' && currentScan != null) {
       bodyWidget = OutcomeResultScreen(
         scan: currentScan,
-        lastSuccess: lastSuccess,
         onActionClick: _onScanNext,
+        onConfirmRedemption: () => _confirmSelectedRedemptions(currentScan),
+        onRetryVerification: () => _retryCurrentVerification(currentScan),
+        onToggleRelatedTicket: (ticket) =>
+            _toggleRelatedTicketSelection(ticket, currentScan),
+        onTogglePrimaryTicket: () => _togglePrimaryTicketSelection(currentScan),
+        isPrimarySelected:
+            currentScan.addonId != null &&
+            _selectedRedemptionKeys.contains(
+              _redemptionKey(currentScan.ticketId, currentScan.addonId!),
+            ),
+        selectedTicketCount: _selectedTicketCount(currentScan),
+        selectedRedemptionKeys: Set<String>.unmodifiable(
+          _selectedRedemptionKeys,
+        ),
+        onClearSelection: _clearRedemptionSelection,
+        onRetryRelatedEligibility: () =>
+            _retryRelatedTicketEligibility(currentScan),
+        isConfirming: _isRedemptionProcessing,
       );
     } else {
       bodyWidget = DashboardScreen(
@@ -455,7 +776,11 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
                       Expanded(
                         child: InkWell(
                           onTap: () {
-                            if (_screen != 'verifying') {
+                            if (!_isRedemptionProcessing &&
+                                _selectedRedemptionKeys.isEmpty &&
+                                _screen != 'verifying' &&
+                                !(_screen == 'outcome' &&
+                                    currentScan?.outcome == Outcome.ready)) {
                               setState(() => _screen = 'dashboard');
                             }
                           },
@@ -492,7 +817,11 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
                       Expanded(
                         child: InkWell(
                           onTap: () {
-                            if (_screen != 'verifying') {
+                            if (!_isRedemptionProcessing &&
+                                _selectedRedemptionKeys.isEmpty &&
+                                _screen != 'verifying' &&
+                                !(_screen == 'outcome' &&
+                                    currentScan?.outcome == Outcome.ready)) {
                               setState(() => _screen = 'scanner');
                             }
                           },
@@ -542,7 +871,9 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
                       Expanded(
                         child: InkWell(
                           onTap: () {
-                            if (_screen != 'verifying') {
+                            if (!_isRedemptionProcessing &&
+                                _selectedRedemptionKeys.isEmpty &&
+                                _screen != 'verifying') {
                               ref
                                   .read(redemptionHistoryProvider.notifier)
                                   .refresh();

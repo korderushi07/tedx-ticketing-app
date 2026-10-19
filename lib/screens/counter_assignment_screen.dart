@@ -8,6 +8,7 @@ class CounterAssignmentScreen extends StatefulWidget {
   final CounterInfo counter;
   final String volunteerName;
   final String volunteerCode;
+  final Future<List<CounterInfo>> Function()? counterLoader;
   final ValueChanged<CounterInfo>? onCounterSelected;
   final VoidCallback onStartScanning;
   final VoidCallback? onBackPressed;
@@ -18,6 +19,7 @@ class CounterAssignmentScreen extends StatefulWidget {
     required this.volunteerName,
     required this.volunteerCode,
     required this.onStartScanning,
+    this.counterLoader,
     this.onCounterSelected,
     this.onBackPressed,
   });
@@ -31,6 +33,7 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
   late CounterInfo _selectedCounter;
   List<CounterInfo> _availableCounters = [];
   bool _isLoading = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -42,25 +45,23 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
   Future<void> _loadCounters() async {
     setState(() => _isLoading = true);
     try {
-      final counters = await ApiService().getCounters();
+      final counters =
+          await (widget.counterLoader ?? ApiService().getCounters)();
       if (mounted) {
         setState(() {
+          _availableCounters = counters;
+          _loadError = counters.isEmpty
+              ? 'No active counters are available. Contact an administrator.'
+              : null;
           if (counters.isNotEmpty) {
-            _availableCounters = counters;
-            // Match selected counter if present in loaded counters
             final matched = counters.where(
-              (c) => c.id == _selectedCounter.id || c.code == _selectedCounter.code,
+              (counter) =>
+                  counter.id == _selectedCounter.id ||
+                  counter.code == _selectedCounter.code,
             );
-            if (matched.isNotEmpty) {
-              _selectedCounter = matched.first;
-            }
-          } else {
-            _availableCounters = [
-              CounterInfo.food,
-              CounterInfo.merch,
-              CounterInfo.goodie,
-              CounterInfo.workshop,
-            ];
+            _selectedCounter = matched.isNotEmpty
+                ? matched.first
+                : counters.first;
           }
           _isLoading = false;
         });
@@ -69,12 +70,9 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
       debugPrint('[CounterAssignmentScreen] Error loading counters: $e');
       if (mounted) {
         setState(() {
-          _availableCounters = [
-            CounterInfo.food,
-            CounterInfo.merch,
-            CounterInfo.goodie,
-            CounterInfo.workshop,
-          ];
+          _availableCounters = [];
+          _loadError =
+              'Unable to load active counters. Check your connection and retry.';
           _isLoading = false;
         });
       }
@@ -82,6 +80,12 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
   }
 
   void _handleConfirm() {
+    if (_isLoading ||
+        _availableCounters.isEmpty ||
+        _selectedCounter.id == null ||
+        _selectedCounter.addonId == null) {
+      return;
+    }
     ApiService().setSelectedCounter(_selectedCounter);
     widget.onCounterSelected?.call(_selectedCounter);
     widget.onStartScanning();
@@ -271,6 +275,36 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
                 );
               }),
 
+              if (_loadError != null && !_isLoading) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: TEDxColors.cardDark,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: TEDxColors.cardBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _loadError!,
+                        style: AppFonts.body(
+                          color: TEDxColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: _loadCounters,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('RETRY'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 16),
 
               // Volunteer Profile Box
@@ -367,7 +401,9 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
                     const SizedBox(height: 8),
                     _permissionRow('Redeem ${_selectedCounter.benefit}'),
                     const SizedBox(height: 8),
-                    _permissionRow('Audit scan events for ${_selectedCounter.name}'),
+                    _permissionRow(
+                      'Audit scan events for ${_selectedCounter.name}',
+                    ),
                   ],
                 ),
               ),
@@ -377,7 +413,13 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
               ActionButton(
                 text: 'CONFIRM COUNTER & START SCANNING',
                 trailingArrow: '→',
-                onPressed: _handleConfirm,
+                onPressed:
+                    _availableCounters.isNotEmpty &&
+                        !_isLoading &&
+                        _selectedCounter.id != null &&
+                        _selectedCounter.addonId != null
+                    ? _handleConfirm
+                    : null,
               ),
               const SizedBox(height: 12),
               Center(

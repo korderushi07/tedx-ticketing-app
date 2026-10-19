@@ -111,8 +111,14 @@ class ApiService {
         assignedVolunteerName = data['name']?.toString() ?? 'Volunteer';
         assignedVolunteerCode = data['volunteer_code']?.toString() ?? '';
 
-        // Fetch available counters
-        final counters = await getCounters();
+        List<CounterInfo> counters = [];
+        try {
+          counters = await getCounters();
+        } catch (error) {
+          debugPrint(
+            '[ApiService] Counters unavailable while restoring session: $error',
+          );
+        }
 
         // Restore previously selected counter if saved
         final savedCounterIdStr = await _storage.read(
@@ -126,16 +132,8 @@ class ApiService {
           }
         }
 
-        // If no saved counter or counter not matched, check if assigned in profile or default to first
+        // Counter selection is local operational context, not a volunteer assignment.
         if (assignedCounter == null && counters.isNotEmpty) {
-          final profileCounter = data['counter'];
-          if (profileCounter is Map) {
-            final pId = profileCounter['id'] as int?;
-            final matched = counters.where((c) => c.id == pId);
-            if (matched.isNotEmpty) {
-              assignedCounter = matched.first;
-            }
-          }
           assignedCounter ??= counters.first;
         }
 
@@ -189,22 +187,20 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List<dynamic>;
-        final results = <CounterInfo>[];
-        for (final item in list) {
-          try {
-            results.add(
-              CounterInfo.fromJson(Map<String, dynamic>.from(item as Map)),
-            );
-          } catch (e) {
-            debugPrint('[ApiService] Skipping counter parse error: $e');
-          }
-        }
-        return results;
+        return list
+            .map(
+              (item) =>
+                  CounterInfo.fromJson(Map<String, dynamic>.from(item as Map)),
+            )
+            .toList(growable: false);
       }
-      return [];
+      throw http.ClientException(
+        'Counter request failed with HTTP ${response.statusCode}.',
+        url,
+      );
     } catch (e) {
       debugPrint('[API ERROR] GET $url failed: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -232,23 +228,6 @@ class ApiService {
           final vol = data['volunteer'] as Map<String, dynamic>;
           assignedVolunteerName = vol['name']?.toString();
           assignedVolunteerCode = vol['volunteer_code']?.toString();
-
-          final counter = vol['counter'];
-          if (counter is Map) {
-            try {
-              assignedCounter = CounterInfo.fromJson(
-                Map<String, dynamic>.from(counter),
-              );
-              await setSelectedCounter(assignedCounter);
-            } catch (_) {}
-          }
-        }
-
-        // Fetch counters and pick first if none set
-        final counters = await getCounters();
-        if (assignedCounter == null && counters.isNotEmpty) {
-          assignedCounter = counters.first;
-          await setSelectedCounter(assignedCounter);
         }
       }
 
@@ -282,13 +261,30 @@ class ApiService {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 404) {
+        final detail = body['detail'];
+        final error = detail is Map ? detail['error'] : body['error'];
+        final message = detail is Map ? detail['message'] : body['message'];
         return {
-          'error': 'INVALID_QR',
+          'error': error ?? 'VERIFICATION_FAILED',
           'message':
-              body['message'] ?? 'This QR code is not registered with TEDx.',
+              message?.toString() ??
+              (error == 'INVALID_QR'
+                  ? 'This QR code is not registered with TEDx.'
+                  : 'Ticket verification failed.'),
         };
       }
 
+      if (response.statusCode != 200) {
+        final detail = body['detail'];
+        final error = detail is Map ? detail['error'] : body['error'];
+        final message = detail is Map ? detail['message'] : body['message'];
+        return {
+          'error': error ?? 'VERIFICATION_FAILED',
+          'message':
+              message?.toString() ??
+              'Ticket verification failed with HTTP ${response.statusCode}.',
+        };
+      }
       return body;
     } catch (e) {
       debugPrint('[API ERROR] GET $url failed: $e');
@@ -345,6 +341,34 @@ class ApiService {
     }
   }
 
+  /// Get the attendee's current entitlement and redemption details.
+  Future<List<dynamic>> getAttendeeEntitlements(int attendeeId) async {
+    final url = Uri.parse(
+      '${ApiConfig.baseUrl}/api/v1/attendees/$attendeeId/entitlements',
+    );
+    debugPrint('[API REQUEST] GET $url');
+
+    try {
+      final response = await http
+          .get(url, headers: _getHeaders())
+          .timeout(const Duration(seconds: 8));
+
+      debugPrint(
+        '[API RESPONSE] Status ${response.statusCode}: ${response.body}',
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as List<dynamic>;
+      }
+      throw http.ClientException(
+        'Attendee entitlements request failed with HTTP ${response.statusCode}.',
+        url,
+      );
+    } catch (e) {
+      debugPrint('[API ERROR] GET $url failed: $e');
+      rethrow;
+    }
+  }
+
   /// Get Counter Statistics from Database
   Future<Map<String, dynamic>> getCounterStats(int counterId) async {
     final url = Uri.parse(
@@ -363,10 +387,13 @@ class ApiService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
-      return {};
+      throw http.ClientException(
+        'Counter stats request failed with HTTP ${response.statusCode}.',
+        url,
+      );
     } catch (e) {
       debugPrint('[API ERROR] GET $url failed: $e');
-      return {};
+      rethrow;
     }
   }
 }

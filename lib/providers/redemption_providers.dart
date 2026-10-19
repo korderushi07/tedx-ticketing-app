@@ -4,7 +4,9 @@ import '../models/app_models.dart';
 import '../services/api_service.dart';
 
 /// Provider for active counter selection
-final counterProvider = StateNotifierProvider<CounterNotifier, CounterInfo>((ref) {
+final counterProvider = StateNotifierProvider<CounterNotifier, CounterInfo>((
+  ref,
+) {
   return CounterNotifier();
 });
 
@@ -17,9 +19,10 @@ class CounterNotifier extends StateNotifier<CounterInfo> {
 }
 
 /// Provider for active scan result state (separate from persistent history)
-final currentScanProvider = StateNotifierProvider<CurrentScanNotifier, ScanModel?>((ref) {
-  return CurrentScanNotifier();
-});
+final currentScanProvider =
+    StateNotifierProvider<CurrentScanNotifier, ScanModel?>((ref) {
+      return CurrentScanNotifier();
+    });
 
 class CurrentScanNotifier extends StateNotifier<ScanModel?> {
   CurrentScanNotifier() : super(null);
@@ -35,11 +38,15 @@ class CurrentScanNotifier extends StateNotifier<ScanModel?> {
 
 /// Provider for persistent redemption history fetched directly from SQLite via FastAPI
 final redemptionHistoryProvider =
-    StateNotifierProvider<RedemptionHistoryNotifier, AsyncValue<List<ScanModel>>>((ref) {
-  return RedemptionHistoryNotifier();
-});
+    StateNotifierProvider<
+      RedemptionHistoryNotifier,
+      AsyncValue<List<ScanModel>>
+    >((ref) {
+      return RedemptionHistoryNotifier();
+    });
 
-class RedemptionHistoryNotifier extends StateNotifier<AsyncValue<List<ScanModel>>> {
+class RedemptionHistoryNotifier
+    extends StateNotifier<AsyncValue<List<ScanModel>>> {
   RedemptionHistoryNotifier() : super(const AsyncValue.data([]));
 
   String _formatServerTime(dynamic rawTime) {
@@ -79,6 +86,7 @@ class RedemptionHistoryNotifier extends StateNotifier<AsyncValue<List<ScanModel>
           benefit: addonName,
           counter: counterName,
           outcome: Outcome.approved,
+          volunteerName: m['volunteer_name']?.toString() ?? 'Volunteer',
           attendeeId: m['attendee_id'] as int?,
           addonId: m['addon_id'] as int?,
           counterId: m['counter_id'] as int?,
