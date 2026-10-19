@@ -11,7 +11,7 @@ final counterProvider = StateNotifierProvider<CounterNotifier, CounterInfo>((
 });
 
 class CounterNotifier extends StateNotifier<CounterInfo> {
-  CounterNotifier() : super(CounterInfo.food);
+  CounterNotifier() : super(CounterInfo.unselected);
 
   void setCounter(CounterKey key) {
     state = CounterInfo.fromKey(key);

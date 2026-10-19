@@ -121,6 +121,7 @@ class ApiService {
         }
 
         // Restore previously selected counter if saved
+        assignedCounter = null;
         final savedCounterIdStr = await _storage.read(
           key: 'selected_counter_id',
         );
@@ -132,11 +133,7 @@ class ApiService {
           }
         }
 
-        // Counter selection is local operational context, not a volunteer assignment.
-        if (assignedCounter == null && counters.isNotEmpty) {
-          assignedCounter ??= counters.first;
-        }
-
+        // A missing saved counter returns the volunteer to explicit selection.
         debugPrint(
           '[ApiService] Session restored successfully for $assignedVolunteerName. Active counter: ${assignedCounter?.name}',
         );

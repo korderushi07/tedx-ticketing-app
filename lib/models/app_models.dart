@@ -1,6 +1,6 @@
 enum Outcome { ready, approved, redeemed, notEligible, invalid, network }
 
-enum CounterKey { food, merch, goodie, workshop }
+enum CounterKey { unassigned, registration, food, merch, goodie, workshop }
 
 enum FilterOption { all, approved, rejected }
 
@@ -40,6 +40,22 @@ class CounterInfo {
     total: 0,
   );
 
+  static const registration = CounterInfo(
+    key: CounterKey.registration,
+    name: 'Registration Counter',
+    benefit: 'Ticket Verification',
+    code: 'C01',
+    total: 0,
+  );
+
+  static const unselected = CounterInfo(
+    key: CounterKey.unassigned,
+    name: 'No counter selected',
+    benefit: 'Ticket Verification',
+    code: '',
+    total: 0,
+  );
+
   static const merch = CounterInfo(
     key: CounterKey.merch,
     name: 'T-Shirt Counter',
@@ -65,6 +81,24 @@ class CounterInfo {
   );
 
   factory CounterInfo.fromJson(Map<String, dynamic> json) {
+    final code = json['code']?.toString() ?? '';
+    final name = json['name']?.toString() ?? 'Assigned counter';
+    final id = json['id'];
+    if (id is! int) {
+      throw const FormatException('Counter response is missing its ID.');
+    }
+
+    if (code == 'C01') {
+      return CounterInfo(
+        key: CounterKey.registration,
+        name: name,
+        benefit: 'Ticket Verification',
+        code: code,
+        total: 0,
+        id: id,
+      );
+    }
+
     final addonName = json['addon']?.toString().trim();
     final normalizedAddon = addonName?.toLowerCase() ?? '';
     final key = switch (normalizedAddon) {
@@ -76,17 +110,16 @@ class CounterInfo {
         'Unsupported counter add-on: ${addonName ?? 'none'}',
       ),
     };
-    final id = json['id'];
     final addonId = json['addon_id'];
-    if (id is! int || addonId is! int) {
+    if (addonId is! int) {
       throw const FormatException(
-        'Counter response is missing its ID or add-on ID.',
+        'Non-registration counter response is missing its add-on ID.',
       );
     }
 
     return CounterInfo(
       key: key,
-      name: json['name']?.toString() ?? 'Assigned counter',
+      name: name,
       benefit: addonName ?? 'Addon',
       code: json['code']?.toString() ?? 'Counter',
       total: 0,
@@ -97,6 +130,8 @@ class CounterInfo {
 
   static CounterInfo fromKey(CounterKey key) {
     return switch (key) {
+      CounterKey.unassigned => unselected,
+      CounterKey.registration => registration,
       CounterKey.food => food,
       CounterKey.merch => merch,
       CounterKey.goodie => goodie,

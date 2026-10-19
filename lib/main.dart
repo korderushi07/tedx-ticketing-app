@@ -49,16 +49,18 @@ class VolunteerWorkspace extends ConsumerStatefulWidget {
 class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
   String _screen =
       'loading'; // loading, login, counter, dashboard, scanner, verifying, history, detail, outcome
-  CounterInfo _assignedCounter = CounterInfo.food;
+  CounterInfo _assignedCounter = CounterInfo.unselected;
   String _volunteerName = '';
   String _volunteerCode = '';
   CounterKey get _counterKey => _assignedCounter.key;
 
   final Map<CounterKey, int> _addedCount = {
+    CounterKey.unassigned: 0,
     CounterKey.food: 0,
     CounterKey.merch: 0,
     CounterKey.goodie: 0,
     CounterKey.workshop: 0,
+    CounterKey.registration: 0,
   };
 
   ScanModel? _selectedDetailScan;
@@ -148,10 +150,9 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
     String? previousRedemptionClaimant;
     final counterId = selectedCounter.id;
     final requiredAddonId = selectedCounter.addonId;
-    if (counterId == null || requiredAddonId == null) {
-      debugPrint(
-        '[SCAN] Cannot process a scan without an assigned counter and add-on.',
-      );
+    addonId = requiredAddonId;
+    if (counterId == null) {
+      debugPrint('[SCAN] Cannot process a scan without a selected counter ID.');
       setState(() => _screen = 'dashboard');
       return;
     }
@@ -182,7 +183,11 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
           }
         }
 
-        if (res.containsKey('entitlements') && res['entitlements'] is List) {
+        if (requiredAddonId == null) {
+          outcome = Outcome.ready;
+          statusMessage = 'Ticket verified at ${selectedCounter.name}.';
+        } else if (res.containsKey('entitlements') &&
+            res['entitlements'] is List) {
           final ents = res['entitlements'] as List<dynamic>;
           bool foundCounterEntitlement = false;
 
@@ -297,7 +302,7 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
       orderId: orderId,
       volunteerName: _volunteerName,
       orderTickets: orderTickets,
-      orderTicketsLoading: orderTickets.isNotEmpty,
+      orderTicketsLoading: orderTickets.isNotEmpty && addonId != null,
       statusMessage: statusMessage,
       previousRedemptionAt: previousRedemptionAt,
       previousRedemptionCounter: previousRedemptionCounter,
@@ -310,7 +315,7 @@ class _VolunteerWorkspaceState extends ConsumerState<VolunteerWorkspace> {
     setState(() {
       _screen = 'outcome';
     });
-    if (scan.orderTickets.isNotEmpty) {
+    if (scan.orderTickets.isNotEmpty && scan.addonId != null) {
       unawaited(_loadOrderTicketEligibility(scan));
     }
   }

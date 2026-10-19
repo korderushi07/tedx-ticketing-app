@@ -756,6 +756,41 @@ void main() {
       }
     });
 
+    testWidgets('registration verification has no redemption controls', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: OutcomeResultScreen(
+            scan: const ScanModel(
+              id: 'registration-scan',
+              time: '10:00 AM',
+              name: 'Attendee Name',
+              ticketId: 'TICKET-1',
+              pass: 'General',
+              benefit: 'Ticket Verification',
+              counter: 'Registration Counter',
+              outcome: Outcome.ready,
+              attendeeId: 1,
+              counterId: 1,
+              addonId: null,
+              orderId: 'O7',
+            ),
+            onActionClick: () {},
+            onConfirmRedemption: () async {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ticket verified'), findsOneWidget);
+      expect(find.text('SCAN NEXT TICKET'), findsOneWidget);
+      expect(find.text('Approve'), findsNothing);
+      expect(find.text('SELECT TICKETS TO REDEEM'), findsNothing);
+      expect(find.text('CONFIRM FOOD REDEMPTION'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
     test('currentScanProvider starts null and can set/clear scan', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);

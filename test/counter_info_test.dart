@@ -2,14 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ticketingapp/models/app_models.dart';
 
 void main() {
-  test('counter metadata maps all configured backend add-ons', () {
+  test('counter metadata distinguishes registration from benefit counters', () {
     final counterSpecs = [
       (
         'C01',
         'Registration Counter',
         'Food',
-        1,
-        CounterKey.food,
+        null,
+        CounterKey.registration,
         'Registration / Ticket Verification',
       ),
       ('C02', 'Food Counter 01', 'Food', 1, CounterKey.food, 'Food redemption'),
@@ -47,7 +47,7 @@ void main() {
         'name': name,
         'code': code,
         'addon': addon,
-        'addon_id': addonId,
+        'addon_id': code == 'C01' ? 1 : addonId,
         'is_active': true,
       });
 

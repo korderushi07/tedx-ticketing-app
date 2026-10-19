@@ -43,8 +43,20 @@ class OutcomeResultScreen extends StatelessWidget {
             color: TEDxColors.warning,
             background: TEDxColors.warningBg,
           )
+        : scan.outcome == Outcome.ready && scan.addonId == null
+        ? const _OutcomeStatus(
+            title: 'Ticket verified',
+            icon: Icons.verified_outlined,
+            color: TEDxColors.success,
+            background: TEDxColors.successBg,
+          )
         : _statusFor(scan.outcome);
-    final showRelatedTickets = isKnownTicket && scan.orderId != null;
+    final showRelatedTickets =
+        isKnownTicket && scan.orderId != null && scan.addonId != null;
+    final canSelectTickets =
+        scan.addonId != null &&
+        (scan.outcome == Outcome.ready ||
+            scan.orderTickets.any((ticket) => ticket.isEligible == true));
 
     return Scaffold(
       backgroundColor: TEDxColors.bgDark,
@@ -99,7 +111,8 @@ class OutcomeResultScreen extends StatelessWidget {
                       status: status,
                       isConfirming: isConfirming,
                     ),
-                    if (scan.outcome == Outcome.ready) ...[
+                    if (scan.outcome == Outcome.ready &&
+                        scan.addonId != null) ...[
                       const SizedBox(height: 8),
                       _TicketSelectionButton(
                         selected: isPrimarySelected,
@@ -174,8 +187,7 @@ class OutcomeResultScreen extends StatelessWidget {
                       onPressed: isConfirming ? null : onClearSelection,
                       child: const Text('CLEAR SELECTIONS'),
                     ),
-                  ] else if (scan.outcome == Outcome.ready ||
-                      scan.orderTickets.isNotEmpty) ...[
+                  ] else if (canSelectTickets) ...[
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
@@ -193,10 +205,7 @@ class OutcomeResultScreen extends StatelessWidget {
                         ? 'PROCESSING REDEMPTIONS...'
                         : selectedTicketCount > 0
                         ? 'CONFIRM $selectedTicketCount ${selectedTicketCount == 1 ? 'TICKET' : 'TICKETS'} FOR ${scan.benefit.toUpperCase()}'
-                        : scan.outcome == Outcome.ready ||
-                              scan.orderTickets.any(
-                                (ticket) => ticket.isEligible == true,
-                              )
+                        : canSelectTickets
                         ? 'SELECT TICKETS TO REDEEM'
                         : 'SCAN NEXT TICKET',
                     icon: isConfirming
@@ -215,19 +224,13 @@ class OutcomeResultScreen extends StatelessWidget {
                         ? null
                         : selectedTicketCount > 0
                         ? () => _requestRedemptionConfirmation(context)
-                        : scan.outcome == Outcome.ready ||
-                              scan.orderTickets.any(
-                                (ticket) => ticket.isEligible == true,
-                              )
+                        : canSelectTickets
                         ? null
                         : onActionClick,
                   ),
                   if (!isConfirming &&
                       selectedTicketCount == 0 &&
-                      (scan.outcome == Outcome.ready ||
-                          scan.orderTickets.any(
-                            (ticket) => ticket.isEligible == true,
-                          ))) ...[
+                      canSelectTickets) ...[
                     const SizedBox(height: 4),
                     TextButton.icon(
                       onPressed: onActionClick,

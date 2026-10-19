@@ -53,6 +53,14 @@ void main() {
             volunteerCode: 'VOL-001',
             counterLoader: () async => [
               const CounterInfo(
+                key: CounterKey.registration,
+                name: 'Registration Counter',
+                benefit: 'Ticket Verification',
+                code: 'C01',
+                total: 0,
+                id: 1,
+              ),
+              const CounterInfo(
                 key: CounterKey.food,
                 name: 'Food Counter 01',
                 benefit: 'Food',
@@ -82,7 +90,8 @@ void main() {
       expect(find.text('Rahul Sharma'), findsOneWidget);
       expect(find.text('CONFIRM COUNTER & START SCANNING'), findsOneWidget);
 
-      // Tap Confirm button
+      await tester.tap(find.text('Registration Counter'));
+      await tester.pumpAndSettle();
       final confirmBtn = find.text('CONFIRM COUNTER & START SCANNING');
       await tester.ensureVisible(confirmBtn);
       await tester.tap(confirmBtn);
@@ -90,6 +99,9 @@ void main() {
 
       expect(started, isTrue);
       expect(selected, isNotNull);
+      expect(selected!.code, 'C01');
+      expect(selected!.id, 1);
+      expect(selected!.addonId, isNull);
     },
   );
 

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_theme.dart';
+import '../models/app_models.dart';
 
 class QRScannerScreen extends StatefulWidget {
-  final dynamic counter;
+  final CounterInfo counter;
   final int totalScans;
   final ValueChanged<String> onScanToken;
 
@@ -84,9 +85,9 @@ class _QRScannerScreenState extends State<QRScannerScreen>
 
   @override
   Widget build(BuildContext context) {
-    final counterCode = widget.counter?.code ?? 'FC-01';
-    final counterName = widget.counter?.name ?? 'Food Counter 01';
-    final benefit = widget.counter?.benefit ?? 'Lunch';
+    final counterCode = widget.counter.code;
+    final counterName = widget.counter.name;
+    final benefit = widget.counter.benefit;
 
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;

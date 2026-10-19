@@ -61,7 +61,7 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
             );
             _selectedCounter = matched.isNotEmpty
                 ? matched.first
-                : counters.first;
+                : CounterInfo.unselected;
           }
           _isLoading = false;
         });
@@ -82,8 +82,7 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
   void _handleConfirm() {
     if (_isLoading ||
         _availableCounters.isEmpty ||
-        _selectedCounter.id == null ||
-        _selectedCounter.addonId == null) {
+        _selectedCounter.id == null) {
       return;
     }
     ApiService().setSelectedCounter(_selectedCounter);
@@ -398,8 +397,13 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
                     ),
                     const SizedBox(height: 12),
                     _permissionRow('Scan attendee QR codes'),
-                    const SizedBox(height: 8),
-                    _permissionRow('Redeem ${_selectedCounter.benefit}'),
+                    if (_selectedCounter.addonId != null) ...[
+                      const SizedBox(height: 8),
+                      _permissionRow('Redeem ${_selectedCounter.benefit}'),
+                    ] else if (_selectedCounter.id != null) ...[
+                      const SizedBox(height: 8),
+                      _permissionRow('Verify tickets; no benefit redemption'),
+                    ],
                     const SizedBox(height: 8),
                     _permissionRow(
                       'Audit scan events for ${_selectedCounter.name}',
@@ -416,8 +420,7 @@ class _CounterAssignmentScreenState extends State<CounterAssignmentScreen> {
                 onPressed:
                     _availableCounters.isNotEmpty &&
                         !_isLoading &&
-                        _selectedCounter.id != null &&
-                        _selectedCounter.addonId != null
+                        _selectedCounter.id != null
                     ? _handleConfirm
                     : null,
               ),
